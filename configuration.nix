@@ -12,5 +12,37 @@
   networking.domain = "";
   services.openssh.enable = true;
 
-  system.stateVersion = "23.11";
+  users.users.claw = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" ];
+    shell = pkgs.bash;
+  };
+
+  security.sudo.extraRules = [
+    {
+      users = [ "claw" ];
+      commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
+    }
+  ];
+
+  home-manager.users.claw = { pkgs, ... }: {
+    home.stateVersion = "25.11";
+    home.enableNixpkgsReleaseCheck = false;
+
+    programs.bash.enable = true;
+
+    programs.git = {
+      enable = true;
+      settings.user.name = "clueed-claw";
+      settings.user.email = "clueed@proton.me";
+    };
+
+    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      autoupdate = false;
+      permission = "allow";
+    };
+  };
+
+  system.stateVersion = "25.11";
 }
