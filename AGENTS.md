@@ -4,8 +4,8 @@ This system uses NixOS with home-manager for declarative configuration managemen
 
 ## Structure
 
-- `/etc/nixos/configuration.nix` - Main NixOS system configuration (includes home-manager)
-- `/etc/nixos/flake.nix` - Flake inputs and outputs
+- `/home/claw/nixos/configuration.nix` - Main NixOS system configuration (includes home-manager)
+- `/home/claw/nixos/flake.nix` - Flake inputs and outputs
 
 ## Best Practices
 

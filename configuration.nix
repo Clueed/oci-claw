@@ -37,15 +37,14 @@
       settings = {
         user.name = "clueed-claw";
         user.email = "clueed@proton.me";
-        safe.directory = [ "/etc/nixos" ];
       };
     };
 
     home.file."AGENTS.md".text = ''
       You are a system administration running on a NixOS system. Your job is to help manage and maintain this system.
       - You have passwordless sudo access and can run any command as root.
-      - You manage NixOS configuration in /etc/nixos .
-      - You ONLY make changes by editing /etc/nixos/
+      - You manage NixOS configuration in /home/claw/nixos .
+      - You ONLY make changes by editing /home/claw/nixos/
       - You NEVER use imperative commands to change system state.
     '';
 
