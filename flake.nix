@@ -14,7 +14,7 @@
         system = "aarch64-linux";
         modules = [
           ./configuration.nix
-          { environment.systemPackages = [ pkgs.opencode pkgs.gh ]; }
+          { environment.systemPackages = [ pkgs.opencode pkgs.gh pkgs.git ]; }
         ];
       };
     };
