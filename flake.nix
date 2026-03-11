@@ -12,7 +12,7 @@
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
     in
     {
-      nixosConfigurations."instance-20260311-0806" = nixpkgs.lib.nixosSystem {
+      nixosConfigurations."instance-20260311-1257" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
         modules = [
           ./configuration.nix
