@@ -37,7 +37,7 @@
       settings = {
         user.name = "clueed-claw";
         user.email = "clueed@proton.me";
-        credential = "!gh auth git-credential";
+        credential.helper = "!gh auth git-credential";
       };
     };
 
