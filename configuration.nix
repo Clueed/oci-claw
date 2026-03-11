@@ -11,5 +11,6 @@
   networking.hostName = "instance-20260311-0806";
   networking.domain = "";
   services.openssh.enable = true;
- = "23.11";
+
+  system.stateVersion = "23.11";
 }
