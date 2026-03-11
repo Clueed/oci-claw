@@ -3,7 +3,8 @@
     ./hardware-configuration.nix    
   ];
 
-  # Workaround for https://github.com/NixOS/nix/issues/8502
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   services.logrotate.checkConfig = false;
 
   boot.tmp.cleanOnBoot = true;
