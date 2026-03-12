@@ -16,6 +16,16 @@ This system uses NixOS with home-manager for declarative configuration managemen
 - Test changes with `sudo nixos-rebuild test --flake /home/claw/nixos#` before applying
 - Use `nix flake check` or `nixfmt` for linting
 
+## Secrets
+
+Uses sops-nix with age (SSH host key). Secrets available at `/run/secrets/<name>`.
+
+Update secrets:
+```
+SOPS_AGE_KEY=$(sudo nix run nixpkgs#ssh-to-age -- -private-key -i /etc/ssh/ssh_host_ed25519_key) sops secrets.yaml
+```
+(in /home/claw/nixos)
+
 ## Change Workflow
 
 1. Summarize the changes to be made

@@ -3,6 +3,10 @@
     ./hardware-configuration.nix    
   ];
 
+  sops.defaultSopsFile = ./secrets.yaml;
+  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+  sops.secrets.github_pat.owner = "claw";
+
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   services.logrotate.checkConfig = false;
@@ -32,6 +36,9 @@
     home.enableNixpkgsReleaseCheck = false;
 
     programs.bash.enable = true;
+    programs.bash.initExtra = ''
+      export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
+    '';
 
     programs.git = {
       enable = true;
