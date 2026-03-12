@@ -1,36 +1,29 @@
-# NixOS Setup
+# NixOS Configuration
 
-This system uses NixOS with home-manager for declarative configuration management.
-
-## Structure
-
-- `/home/claw/nixos/configuration.nix` - Main NixOS system configuration (includes home-manager)
-- `/home/claw/nixos/flake.nix` - Flake inputs and outputs
-
-## Best Practices
-
-- Always use the latest Nix/NixOS best practices - search the web for current recommendations
-- Prefer declarative configurations over imperative changes
-- Use `home-manager` for user-level package management and dotfiles
-- Keep secrets in secrets.nix or use age encryption
-- Test changes with `sudo nixos-rebuild test --flake /home/claw/nixos#` before applying
-- Use `nix flake check` or `nixfmt` for linting
-
-## Secrets
-
-Uses sops-nix with age (SSH host key). Secrets available at `/run/secrets/<name>`.
-
-Update secrets:
-```
-SOPS_AGE_KEY=$(sudo nix run nixpkgs#ssh-to-age -- -private-key -i /etc/ssh/ssh_host_ed25519_key) sops secrets.yaml
-```
-(in /home/claw/nixos)
+- Search web for current NixOS best practices
+- Prefer declarative over imperative
+- Use home-manager for user packages/dotfiles
 
 ## Change Workflow
 
-1. Summarize the changes to be made
-2. Confirm with the user before proceeding
-3. Run `sudo nixos-rebuild test --flake /home/claw/nixos#` to validate
-4. If there are errors, fix them and repeat step 3
-5. Once tested successfully: commit and push
-6. Run `sudo nixos-rebuild switch --flake /home/claw/nixos#` to apply
+After making any change, follow this workflow:
+
+1. **Diff** - `nh os switch . --diff` to preview changes
+2. **Confirm** - Summarize changes and get approval
+3. **Test** - `nh os test .` and verify system and changes work (fix or discuss if errors)
+4. **Commit** - `git add -A && git commit -m "msg"`
+5. **Switch** - `nh os switch .`
+6. **Push**
+
+## Files
+
+- `configuration.nix` - Main config (includes home-manager)
+- `flake.nix` - Flake inputs/outputs
+
+## Secrets
+
+Sops-nix with age (SSH host key). Secrets at `/run/secrets/<name>`.
+
+```bash
+SOPS_AGE_KEY=$(sudo nix run nixpkgs#ssh-to-age -- -private-key -i /etc/ssh/ssh_host_ed25519_key) sops secrets.yaml
+```
