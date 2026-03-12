@@ -1,6 +1,12 @@
-{ pkgs, config, ... }: {
+{
+  pkgs,
+  config,
+  ...
+}:
+
+{
   imports = [
-    ./hardware-configuration.nix    
+    ./hardware-configuration.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
@@ -14,6 +20,11 @@
   };
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  programs.nh = {
+    enable = true;
+    flake = "/home/claw/nixos";
+  };
 
   services.logrotate.checkConfig = false;
 
