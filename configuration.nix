@@ -1,4 +1,4 @@
-{ pkgs, ... }: {
+{ pkgs, config, ... }: {
   imports = [
     ./hardware-configuration.nix    
   ];
@@ -6,6 +6,12 @@
   sops.defaultSopsFile = ./secrets.yaml;
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.secrets.github_pat.owner = "claw";
+  sops.secrets.tailscale_auth_key = {};
+
+  services.tailscale = {
+    enable = true;
+    authKeyFile = config.sops.secrets.tailscale_auth_key.path;
+  };
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
