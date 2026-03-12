@@ -53,6 +53,21 @@
     home.stateVersion = "25.11";
     home.enableNixpkgsReleaseCheck = false;
 
+    home.packages = [
+      (pkgs.writeShellScriptBin "nh" ''
+        case "$1 $2" in
+          "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
+          "home switch"|"home test"|"home boot"|"home build"|\
+          "darwin switch"|"darwin test"|"darwin boot"|"darwin build")
+            exec ${pkgs.nh}/bin/nh "$1" "$2" --no-nom "''${@:3}"
+            ;;
+          *)
+            exec ${pkgs.nh}/bin/nh "$@"
+            ;;
+        esac
+      '')
+    ];
+
     programs.bash.enable = true;
     programs.bash.initExtra = ''
       export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
