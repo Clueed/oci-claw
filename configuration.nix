@@ -44,6 +44,14 @@
     programs.bash.enable = true;
     programs.bash.initExtra = ''
       export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
+      
+      opencode() {
+        if [ $# -eq 0 ]; then
+          command opencode attach http://localhost:4096
+        else
+          command opencode "$@"
+        fi
+      }
     '';
 
     programs.git = {
@@ -68,6 +76,20 @@
       "$schema" = "https://opencode.ai/config.json";
       autoupdate = false;
       permission = "allow";
+    };
+
+    systemd.user.services.opencode-web = {
+      Unit = {
+        Description = "OpenCode Web Interface";
+        After = [ "network.target" ];
+      };
+      Service = {
+        ExecStart = "${pkgs.opencode}/bin/opencode web --hostname 0.0.0.0 --port 4096";
+        WorkingDirectory = "/home/claw";
+        Restart = "on-failure";
+        Type = "simple";
+      };
+      Install.WantedBy = [ "default.target" ];
     };
   };
 
