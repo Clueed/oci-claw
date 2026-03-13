@@ -138,7 +138,7 @@
       Service = {
         # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
         # This ensures spawned shells have access to system packages like gh for git credential helper
-        ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${pkgs.opencode}/bin/opencode web --hostname 0.0.0.0 --port 4096'";
+        ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${pkgs.opencode}/bin/opencode web --hostname 0.0.0.0 --port 4096'";
         WorkingDirectory = "/home/claw";
         Restart = "on-failure";
         Type = "simple";
