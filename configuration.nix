@@ -41,7 +41,14 @@
   zramSwap.enable = true;
   networking.hostName = "instance-20260311-1257";
   networking.domain = "";
-  services.openssh.enable = true;
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+    };
+  };
 
   users.users.claw = {
     isNormalUser = true;
