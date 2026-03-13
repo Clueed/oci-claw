@@ -9,18 +9,33 @@
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, home-manager, sops-nix }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      sops-nix,
+    }:
     let
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
     in
     {
+      formatter.aarch64-linux = pkgs.nixfmt-tree;
+
       nixosConfigurations."instance-20260311-1257" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
           sops-nix.nixosModules.sops
-          { environment.systemPackages = [ pkgs.opencode pkgs.gh pkgs.git pkgs.sops ]; }
+          {
+            environment.systemPackages = [
+              pkgs.opencode
+              pkgs.gh
+              pkgs.git
+              pkgs.sops
+            ];
+          }
         ];
       };
     };
