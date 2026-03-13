@@ -65,9 +65,9 @@
     }
   ];
 
-  home-manager.users.claw = { pkgs, ... }: {
+  home-manager.useGlobalPkgs = true;
+  home-manager.users.claw = _: {
     home.stateVersion = "25.11";
-    home.enableNixpkgsReleaseCheck = false;
 
     home.packages = [
       (pkgs.writeShellScriptBin "nh" ''
