@@ -33,7 +33,7 @@ let
 
     rm -f /config/.ready
 
-    until ls /data/remote/. 2>/dev/null; do sleep 1; done
+    until ls /data/remote/. >/dev/null 2>&1; do sleep 1; done
 
     echo "Pulling config from remote..."
     $RCLONE copy --update "$REMOTE/" "$LOCAL/" --exclude "stash-go.sqlite" 2>/dev/null || true
