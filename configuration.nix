@@ -18,7 +18,13 @@
 
   system.activationScripts.ensure-nixos-repo = ''
     if [ ! -d /home/claw/nixos/.git ]; then
-      su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/oci-claw /home/claw/nixos'
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/oci-claw /home/claw/nixos'
+    fi
+  '';
+
+  system.activationScripts.ensure-nanoclaw-repo = ''
+    if [ ! -d /home/claw/nanoclaw/.git ]; then
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/nanoclaw /home/claw/nanoclaw'
     fi
   '';
 
