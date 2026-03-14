@@ -7,6 +7,7 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+    opencode.url = "github:sst/opencode";
   };
 
   outputs =
@@ -15,6 +16,7 @@
       nixpkgs,
       home-manager,
       sops-nix,
+      opencode,
     }:
     let
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
@@ -24,13 +26,14 @@
 
       nixosConfigurations."instance-20260311-1257" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
+        specialArgs = { inherit opencode; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
           sops-nix.nixosModules.sops
           {
             environment.systemPackages = [
-              pkgs.opencode
+              opencode.packages.aarch64-linux.default
               pkgs.gh
               pkgs.git
               pkgs.sops
