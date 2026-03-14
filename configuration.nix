@@ -7,6 +7,7 @@
 {
   imports = [
     ./hardware-configuration.nix
+    ./containers/stash.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
