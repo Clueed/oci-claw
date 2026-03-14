@@ -93,7 +93,7 @@ in
 
   virtualisation.oci-containers.backend = "podman";
 
-  virtualisation.oci-containers.containers.rclone-mount = {
+  virtualisation.oci-containers.containers.stash-data-mount = {
     image = "docker.io/rclone/rclone:latest";
     volumes = [
       "${config.sops.secrets.rclone_config.path}:/rclone-conf/rclone.conf:ro"
@@ -110,7 +110,7 @@ in
     ];
   };
 
-  virtualisation.oci-containers.containers.rclone-sync = {
+  virtualisation.oci-containers.containers.stash-config-sync = {
     image = "docker.io/rclone/rclone:latest";
     volumes = [
       "${config.sops.secrets.rclone_config.path}:/rclone-conf/rclone.conf:ro"
@@ -125,7 +125,7 @@ in
     ];
   };
 
-  virtualisation.oci-containers.containers.stash = {
+  virtualisation.oci-containers.containers.stash-app = {
     image = "docker.io/stashapp/stash:v0.30.1";
     environment = {
       STASH_STASH = "/data";
@@ -155,14 +155,14 @@ in
     ];
   };
 
-  systemd.services."podman-rclone-sync" = {
-    after = [ "podman-rclone-mount.service" ];
-    requires = [ "podman-rclone-mount.service" ];
+  systemd.services."podman-stash-config-sync" = {
+    after = [ "podman-stash-data-mount.service" ];
+    requires = [ "podman-stash-data-mount.service" ];
   };
 
-  systemd.services."podman-stash" = {
-    after = [ "podman-rclone-sync.service" ];
-    requires = [ "podman-rclone-sync.service" ];
+  systemd.services."podman-stash-app" = {
+    after = [ "podman-stash-config-sync.service" ];
+    requires = [ "podman-stash-config-sync.service" ];
   };
 
   networking.firewall.allowedTCPPorts = [ 9999 ];
