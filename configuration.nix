@@ -9,6 +9,7 @@
   imports = [
     ./hardware-configuration.nix
     ./containers/stash.nix
+    ./containers/nanoclaw.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
