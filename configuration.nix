@@ -21,6 +21,22 @@
     authKeyFile = config.sops.secrets.tailscale_auth_key.path;
   };
 
+  systemd.services.tailscale-serve = {
+    description = "Tailscale Serve for Stash";
+    after = [ "tailscaled.service" ];
+    requires = [ "tailscaled.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ pkgs.tailscale ];
+    script = ''
+      until tailscale status --json >/dev/null 2>&1; do sleep 1; done
+      tailscale serve --service=svc:stash --https=9999 127.0.0.1:9999
+    '';
+  };
+
   nix.settings = {
     experimental-features = [
       "nix-command"
