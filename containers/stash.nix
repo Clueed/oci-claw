@@ -36,9 +36,7 @@ let
     until ls /data/remote/. 2>/dev/null; do sleep 1; done
 
     echo "Pulling config from remote..."
-    $RCLONE copy --update "$REMOTE/scrapers/" "$LOCAL/scrapers/" 2>/dev/null || mkdir -p "$LOCAL/scrapers"
-    $RCLONE copy --update "$REMOTE/plugins/" "$LOCAL/plugins/" 2>/dev/null || mkdir -p "$LOCAL/plugins"
-    $RCLONE copy --update "$REMOTE/config.yml" "$LOCAL/" 2>/dev/null || true
+    $RCLONE copy --update "$REMOTE/" "$LOCAL/" --exclude "stash-go.sqlite" 2>/dev/null || true
 
     echo "Pulling database from remote (if newer)..."
     $RCLONE copy --update "$REMOTE/" "$LOCAL/" --include "stash-go.sqlite" 2>/dev/null || echo "No remote DB, will create new"
@@ -53,19 +51,20 @@ let
 
       echo "Syncing..."
 
-      $RCLONE copy --update "$REMOTE/scrapers/" "$LOCAL/scrapers/"
-      $RCLONE copy --update "$REMOTE/plugins/" "$LOCAL/plugins/"
-      $RCLONE copy --update "$REMOTE/config.yml" "$LOCAL/"
+      $RCLONE copy --update "$REMOTE/" "$LOCAL/" --exclude "stash-go.sqlite"
 
-      $RCLONE copy --update "$LOCAL/scrapers/" "$REMOTE/scrapers/"
-      $RCLONE copy --update "$LOCAL/plugins/" "$REMOTE/plugins/"
-      $RCLONE copy --update "$LOCAL/config.yml" "$REMOTE/"
+      if ! $RCLONE check "$LOCAL/" "$REMOTE/" --exclude "stash-go.sqlite" 2>/dev/null; then
+        $RCLONE copy --update "$LOCAL/" "$REMOTE/" --exclude "stash-go.sqlite"
+        echo "Config synced (changed)"
+      fi
 
       if [ -f "$LOCAL/stash-go.sqlite" ]; then
         sqlite3 "$LOCAL/stash-go.sqlite" ".backup '/tmp/stash-go.sqlite'"
-        $RCLONE copyto "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite"
+        if ! $RCLONE check "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite" 2>/dev/null; then
+          $RCLONE copyto "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite"
+          echo "Database backed up (changed)"
+        fi
         rm -f /tmp/stash-go.sqlite
-        echo "Database backed up"
       fi
 
       echo "Sync complete"
