@@ -16,6 +16,12 @@
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
 
+  system.activationScripts.ensure-nixos-repo = ''
+    if [ ! -d /home/claw/nixos/.git ]; then
+      su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/oci-claw /home/claw/nixos'
+    fi
+  '';
+
   services.tailscale = {
     enable = true;
     authKeyFile = config.sops.secrets.tailscale_auth_key.path;
