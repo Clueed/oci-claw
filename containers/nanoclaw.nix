@@ -15,8 +15,7 @@ in
   sops.templates."nanoclaw.env" = {
     owner = "claw";
     content = ''
-    ANTHROPIC_AUTH_TOKEN=${config.sops.placeholder.nanoclaw_auth_token}
-    ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+    CLAUDE_CODE_OAUTH_TOKEN=${config.sops.placeholder.nanoclaw_auth_token}
     TELEGRAM_BOT_TOKEN=${config.sops.placeholder.nanoclaw_telegram_token}
     ASSISTANT_NAME="Andy"
   '';
