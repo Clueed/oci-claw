@@ -1,10 +1,15 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 let
   nanoclawDir = "/home/claw/nanoclaw";
 in
 {
-  sops.secrets.nanoclaw_auth_token = {
+  sops.secrets.nanoclaw_anthropic_api_key = {
     owner = "claw";
   };
 
@@ -15,10 +20,25 @@ in
   sops.templates."nanoclaw.env" = {
     owner = "claw";
     content = ''
-    CLAUDE_CODE_OAUTH_TOKEN=${config.sops.placeholder.nanoclaw_auth_token}
-    TELEGRAM_BOT_TOKEN=${config.sops.placeholder.nanoclaw_telegram_token}
-    ASSISTANT_NAME="Andy"
-  '';
+      ANTHROPIC_API_KEY=${config.sops.placeholder.nanoclaw_anthropic_api_key}
+      ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+      API_TIMEOUT_MS=3000000
+
+      # Not passed currently
+      ANTHROPIC_MODEL=glm-4.7
+      ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.5-Air
+      ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7
+      ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5
+      CLAUDE_CODE_SUBAGENT_MODEL=glm-4.7
+      DISABLE_TELEMETRY="1"
+      CLAUDE_CODE_ENABLE_TELEMETRY="0"
+      CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY="1"
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+      SKIP_CLAUDE_API="1"
+
+      TELEGRAM_BOT_TOKEN=${config.sops.placeholder.nanoclaw_telegram_token}
+      ASSISTANT_NAME="Andy"
+    '';
   };
 
   system.activationScripts.nanoclaw-env = lib.stringAfter [ "setupSecrets" ] ''
@@ -33,8 +53,8 @@ in
 
   home-manager.users.claw = _: {
     xdg.configFile."nanoclaw/mount-allowlist.json".text = builtins.toJSON {
-      allowedRoots = [];
-      blockedPatterns = [];
+      allowedRoots = [ ];
+      blockedPatterns = [ ];
       nonMainReadOnly = true;
     };
 
@@ -55,7 +75,10 @@ in
     systemd.user.services.nanoclaw = {
       Unit = {
         Description = "NanoClaw Personal Claude Assistant";
-        After = [ "network.target" "nanoclaw-container.service" ];
+        After = [
+          "network.target"
+          "nanoclaw-container.service"
+        ];
         Wants = [ "nanoclaw-container.service" ];
         ConditionPathExists = "${nanoclawDir}/.env";
       };
