@@ -21,6 +21,10 @@ in
     owner = "claw";
   };
 
+  sops.secrets.nanoclaw_todoist_api_key = {
+    owner = "claw";
+  };
+
   sops.templates."nanoclaw.env" = {
     owner = "claw";
     content = ''
@@ -42,6 +46,7 @@ in
 
       TELEGRAM_BOT_TOKEN=${config.sops.placeholder.nanoclaw_telegram_token}
       GROQ_API_KEY=${config.sops.placeholder.nanoclaw_groq_api_key}
+      TODOIST_API_KEY=${config.sops.placeholder.nanoclaw_todoist_api_key}
       ASSISTANT_NAME="Andy"
     '';
   };
