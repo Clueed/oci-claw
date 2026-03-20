@@ -86,7 +86,7 @@
 
   boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
-  networking.hostName = "instance-20260311-1257";
+  networking.hostName = "ociclaw-1";
   networking.domain = "";
   services.openssh = {
     enable = true;
