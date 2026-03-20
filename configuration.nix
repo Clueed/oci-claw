@@ -5,6 +5,9 @@
   ...
 }:
 
+let
+  mdCrmDir = "/home/claw/repos/md-crm";
+in
 {
   imports = [
     ./hardware-configuration.nix
@@ -27,6 +30,16 @@
     if [ ! -d /home/claw/nanoclaw/.git ]; then
       /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/nanoclaw /home/claw/nanoclaw'
     fi
+  '';
+
+  system.activationScripts.ensure-md-crm-repo = ''
+    if [ ! -d ${mdCrmDir}/.git ]; then
+      mkdir -p $(dirname ${mdCrmDir})
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/md-crm.git ${mdCrmDir}'
+    fi
+    # Podman rootless maps host uid to root inside containers.
+    # The container's node user needs world-writable dirs to create/edit vault files.
+    chmod 777 ${mdCrmDir} ${mdCrmDir}/People
   '';
 
   services.tailscale = {

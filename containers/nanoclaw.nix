@@ -7,6 +7,7 @@
 
 let
   nanoclawDir = "/home/claw/nanoclaw";
+  mdCrmDir = "/home/claw/repos/md-crm";
 in
 {
   sops.secrets.nanoclaw_anthropic_api_key = {
@@ -55,6 +56,15 @@ in
     ln -sf ${config.sops.templates."nanoclaw.env".path} ${nanoclawDir}/.env
   '';
 
+  # Podman rootless maps host uid to root inside containers.
+  # IPC subdirectories need world-writable permissions so the container's
+  # node user can read/unlink files written by the host.
+  system.activationScripts.nanoclaw-ipc-perms = ''
+    for dir in ${nanoclawDir}/data/ipc/*/input ${nanoclawDir}/data/ipc/*/messages ${nanoclawDir}/data/ipc/*/tasks; do
+      [ -d "$dir" ] && chmod 777 "$dir"
+    done
+  '';
+
   environment.systemPackages = [
     pkgs.nodejs_22
   ];
@@ -63,9 +73,15 @@ in
 
   home-manager.users.claw = _: {
     xdg.configFile."nanoclaw/mount-allowlist.json".text = builtins.toJSON {
-      allowedRoots = [ ];
+      allowedRoots = [
+        {
+          path = mdCrmDir;
+          allowReadWrite = true;
+          description = "Personal CRM vault";
+        }
+      ];
       blockedPatterns = [ ];
-      nonMainReadOnly = true;
+      nonMainReadOnly = false;
     };
 
     systemd.user.services.nanoclaw-container = {
