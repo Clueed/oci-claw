@@ -181,6 +181,8 @@ in
       - You NEVER use imperative commands to change system state.
     '';
 
+    home.file."CLAUDE.md".text = "@AGENTS.md";
+
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
       autoupdate = false;
