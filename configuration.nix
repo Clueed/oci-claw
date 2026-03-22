@@ -5,16 +5,42 @@
   ...
 }:
 
+let
+  mdCrmDir = "/home/claw/repos/md-crm";
+in
 {
   imports = [
     ./hardware-configuration.nix
     ./containers/stash.nix
+    ./containers/nanoclaw.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
+
+  system.activationScripts.ensure-nixos-repo = ''
+    if [ ! -d /home/claw/nixos/.git ]; then
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/oci-claw /home/claw/nixos'
+    fi
+  '';
+
+  system.activationScripts.ensure-nanoclaw-repo = ''
+    if [ ! -d /home/claw/nanoclaw/.git ]; then
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/nanoclaw /home/claw/nanoclaw'
+    fi
+  '';
+
+  system.activationScripts.ensure-md-crm-repo = ''
+    if [ ! -d ${mdCrmDir}/.git ]; then
+      mkdir -p $(dirname ${mdCrmDir})
+      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/md-crm.git ${mdCrmDir}'
+    fi
+    # Podman rootless maps host uid to root inside containers.
+    # The container's node user needs world-writable dirs to create/edit vault files.
+    chmod 777 ${mdCrmDir} ${mdCrmDir}/People
+  '';
 
   services.tailscale = {
     enable = true;
@@ -62,6 +88,8 @@
     options = "--delete-older-than 7d";
   };
 
+  nixpkgs.config.allowUnfree = true;
+
   programs.nh = {
     enable = true;
     flake = "/home/claw/nixos";
@@ -71,7 +99,7 @@
 
   boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
-  networking.hostName = "instance-20260311-1257";
+  networking.hostName = "ociclaw-1";
   networking.domain = "";
   services.openssh = {
     enable = true;
@@ -152,6 +180,8 @@
       - You ONLY make changes by editing /home/claw/nixos/
       - You NEVER use imperative commands to change system state.
     '';
+
+    home.file."CLAUDE.md".text = "@AGENTS.md";
 
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
