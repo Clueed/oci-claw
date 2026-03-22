@@ -49,6 +49,7 @@ in
       GROQ_API_KEY=${config.sops.placeholder.nanoclaw_groq_api_key}
       TODOIST_API_KEY=${config.sops.placeholder.nanoclaw_todoist_api_key}
       ASSISTANT_NAME="Andy"
+      MD_CRM_DIR=${mdCrmDir}
     '';
   };
 
