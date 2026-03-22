@@ -18,6 +18,9 @@ let
       --vfs-read-chunk-size-limit off \
       --buffer-size 1024M \
       --transfers 8 \
+      --vfs-cache-max-size 80G \
+      --vfs-cache-max-age 1h \
+      --vfs-cache-poll-interval 1m \
       --dir-cache-time 5m \
       --rc \
       --rc-addr :5572 \
