@@ -62,10 +62,13 @@ let
       fi
 
       if [ -f "$LOCAL/stash-go.sqlite" ]; then
-        sqlite3 "$LOCAL/stash-go.sqlite" ".backup '/tmp/stash-go.sqlite'"
-        if ! $RCLONE check "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite" 2>/dev/null; then
-          $RCLONE copyto "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite"
-          echo "Database backed up (changed)"
+        if sqlite3 "$LOCAL/stash-go.sqlite" ".backup '/tmp/stash-go.sqlite'" 2>/dev/null; then
+          if ! $RCLONE check "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite" 2>/dev/null; then
+            $RCLONE copyto "/tmp/stash-go.sqlite" "$REMOTE/stash-go.sqlite"
+            echo "Database backed up (changed)"
+          fi
+        else
+          echo "ERROR: Database backup failed (possible corruption), skipping remote push"
         fi
         rm -f /tmp/stash-go.sqlite
       fi
