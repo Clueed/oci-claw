@@ -29,6 +29,7 @@
       Unit.Description = "ALDI TALK data balance checker timer";
       Timer = {
         OnCalendar = "*:0/15";
+        RandomizedDelaySec = "5min";
         Persistent = true;
       };
       Install.WantedBy = [ "timers.target" ];

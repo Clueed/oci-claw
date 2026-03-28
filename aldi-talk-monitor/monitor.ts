@@ -14,6 +14,27 @@ const BFF          = `${PORTAL_BASE}/scs/bff/scs-209-selfcare-dashboard-bff/self
 const NAV_BFF      = `${PORTAL_BASE}/scs/bff/scs-207-customer-master-data-bff/customer-master-data/v1`;
 const REFILL_URL   = `${BFF}/offer/updateUnlimited`;
 const SESSION_FILE = `${import.meta.dir}/session.json`;
+const STATE_FILE   = `${import.meta.dir}/state.json`;
+
+// When remainKB >= FAST_RATIO * threshKB, slow-poll (SLOW_INTERVAL_MS between runs).
+// Below that, the 15-min timer fires normally for prompt refill detection.
+const FAST_RATIO        = 1.5;
+const SLOW_INTERVAL_MS  = 2 * 60 * 60 * 1000; // 2 hours
+
+const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+const DEFAULT_HEADERS: Record<string, string> = {
+  'User-Agent':      UA,
+  'Accept':          'application/json, text/plain, */*',
+  'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, br',
+};
+
+const PORTAL_HEADERS: Record<string, string> = {
+  ...DEFAULT_HEADERS,
+  'Origin':  PORTAL_BASE,
+  'Referer': `${PORTAL_BASE}/user/auth/account-overview/`,
+};
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +94,37 @@ interface RefillResponse {
   status: string;
   isUpdated: boolean;
   message?: string;
+}
+
+interface State {
+  checkedAt: number;
+  remainKB: number | null;
+  threshKB: number;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const jitter = (a: number, b: number) => new Promise(r => setTimeout(r, a + Math.random() * (b - a)));
+
+// ── Adaptive polling state ────────────────────────────────────────────────────
+
+async function loadState(): Promise<State | null> {
+  try {
+    return JSON.parse(await Bun.file(STATE_FILE).text()) as State;
+  } catch {
+    return null;
+  }
+}
+
+async function saveState(state: State): Promise<void> {
+  await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+function shouldSkip(state: State | null): boolean {
+  if (!state || state.remainKB === null) return false;
+  const age = Date.now() - state.checkedAt;
+  const aboveThreshold = state.remainKB >= FAST_RATIO * state.threshKB;
+  return aboveThreshold && age < SLOW_INTERVAL_MS;
 }
 
 // ── Cookie jar ───────────────────────────────────────────────────────────────
@@ -146,8 +198,8 @@ async function loadSession(): Promise<CookieJar> {
 
 // ── HTTP helpers ─────────────────────────────────────────────────────────────
 
-async function get(jar: CookieJar, url: string, extraHeaders?: HeadersInit): Promise<Response> {
-  const headers = new Headers(extraHeaders);
+async function get(jar: CookieJar, url: string, extraHeaders?: Record<string, string>): Promise<Response> {
+  const headers = new Headers({ ...DEFAULT_HEADERS, ...extraHeaders });
   const cookieStr = jar.header(url);
   if (cookieStr) headers.set('Cookie', cookieStr);
   const res = await fetch(url, { headers, redirect: 'manual' });
@@ -155,8 +207,8 @@ async function get(jar: CookieJar, url: string, extraHeaders?: HeadersInit): Pro
   return res;
 }
 
-async function post(jar: CookieJar, url: string, body: unknown, extraHeaders?: HeadersInit): Promise<Response> {
-  const headers = new Headers(extraHeaders);
+async function post(jar: CookieJar, url: string, body: unknown, extraHeaders?: Record<string, string>): Promise<Response> {
+  const headers = new Headers({ ...DEFAULT_HEADERS, ...extraHeaders });
   headers.set('Content-Type', 'application/json');
   const cookieStr = jar.header(url);
   if (cookieStr) headers.set('Cookie', cookieStr);
@@ -208,7 +260,11 @@ async function sha256Base64url(input: string): Promise<string> {
 
 async function authenticate(jar: CookieJar): Promise<void> {
   const AUTH_URL = `${AUTH_BASE}/signin/json/realms/root/realms/alditalk/authenticate`;
-  const authHeaders = { 'Accept-API-Version': 'resource=2.1, protocol=1.0' };
+  const authHeaders = {
+    'Accept-API-Version': 'resource=2.1, protocol=1.0',
+    'Referer': `${AUTH_BASE}/signin/XUI/#login/`,
+    'Origin':  AUTH_BASE,
+  };
 
   const authPost = async (body: unknown): Promise<AuthResponse> => {
     const res = await post(jar, AUTH_URL, body, authHeaders);
@@ -217,6 +273,7 @@ async function authenticate(jar: CookieJar): Promise<void> {
 
   // Step 1: get initial callbacks
   const init = await authPost({});
+  await jitter(200, 700);
 
   // Step 2: submit credentials → receive PoW challenge
   const withCreds = (callbacks: Callback[]): Callback[] =>
@@ -229,6 +286,7 @@ async function authenticate(jar: CookieJar): Promise<void> {
     });
 
   const step1 = await authPost({ ...init, callbacks: withCreds(init.callbacks!) });
+  await jitter(200, 700);
 
   // Step 3: solve Proof-of-Work and submit
   const script     = step1.callbacks!.find(c => c.type === 'TextOutputCallback')!.output![0].value;
@@ -246,6 +304,8 @@ async function authenticate(jar: CookieJar): Promise<void> {
   const auth = await authPost({ ...step1, callbacks: withPoW(step1.callbacks!) });
   if (!auth.tokenId) throw new Error(`Auth failed: ${JSON.stringify(auth)}`);
   process.stderr.write('ForgeRock auth complete.\n');
+
+  await jitter(200, 700);
 
   // Exchange ForgeRock session for portal session via OAuth2 PKCE
   const codeVerifier  = randomBase64url(48);
@@ -277,7 +337,7 @@ async function fetchContractId(jar: CookieJar): Promise<string> {
   const e164   = atob(lgrsId);           // e.g. "4915785665123"
   const msisdn = e164.startsWith('49') ? e164.slice(2) : e164;
 
-  const res  = await get(jar, `${NAV_BFF}/navigation-list?msisdn=${msisdn}`);
+  const res  = await get(jar, `${NAV_BFF}/navigation-list?msisdn=${msisdn}`, PORTAL_HEADERS);
   const body = await res.text();
   if (!body.startsWith('{')) throw new Error(`Contract discovery failed (HTTP ${res.status}): ${body.slice(0, 100)}`);
   const data       = JSON.parse(body) as { userDetails?: { subscriptions?: Array<{ contractId: string }> } };
@@ -290,7 +350,7 @@ async function fetchContractId(jar: CookieJar): Promise<string> {
 
 async function fetchOffers(jar: CookieJar, contractId: string): Promise<OffersResponse> {
   const url  = `${BFF}/offers?warningDays=28&contractId=${contractId}&productType=Mobile_Product_Offer`;
-  const res  = await get(jar, url);
+  const res  = await get(jar, url, PORTAL_HEADERS);
   const body = await res.text();
   if (!body.startsWith('{')) throw new Error(`Session expired (HTTP ${res.status})`);
   return JSON.parse(body) as OffersResponse;
@@ -361,7 +421,7 @@ async function triggerRefill(jar: CookieJar, offer: Offer): Promise<RefillRespon
     updateOfferResourceID: offer.resourceId,
     amount:                offer.onDemandAmountValueUid,
     refillThresholdValue:  offer.refillThresholdValueUid,
-  });
+  }, PORTAL_HEADERS);
   const body = await res.text();
   if (!body.startsWith('{')) throw new Error(`Refill HTTP ${res.status}: ${body.slice(0, 100)}`);
   return JSON.parse(body) as RefillResponse;
@@ -370,12 +430,21 @@ async function triggerRefill(jar: CookieJar, offer: Offer): Promise<RefillRespon
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Adaptive polling: skip if balance was comfortable and checked recently
+  const state = await loadState();
+  if (shouldSkip(state)) {
+    const nextAt = new Date(state!.checkedAt + SLOW_INTERVAL_MS).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
+    process.stderr.write(`Balance OK (${toGB(state!.remainKB!)} GB > ${FAST_RATIO}× threshold) — next full check at ${nextAt}\n`);
+    return;
+  }
+
   let jar = await loadSession();
 
   let contractId: string;
   let data: OffersResponse;
   try {
     contractId = await fetchContractId(jar);
+    await jitter(200, 700);
     data = await fetchOffers(jar, contractId);
   } catch {
     process.stderr.write('Session expired — reauthenticating...\n');
@@ -383,19 +452,29 @@ async function main(): Promise<void> {
     await authenticate(jar);
     await saveSession(jar);
     contractId = await fetchContractId(jar);
+    await jitter(200, 700);
     data = await fetchOffers(jar, contractId);
   }
 
   const parsed = parseOffers(data);
   printDataBalance(parsed);
 
+  // Persist state for adaptive polling
+  const primary = parsed[0];
+  if (primary) {
+    await saveState({ checkedAt: Date.now(), remainKB: primary.remainKB, threshKB: primary.threshKB });
+  }
+
   for (const { offer, refillAvailable } of parsed) {
     if (!refillAvailable) continue;
+    await jitter(200, 700);
     process.stderr.write(`Triggering refill for ${offer.offerName}...\n`);
     const refill = await triggerRefill(jar, offer);
     if (refill.status === '200' && refill.isUpdated) {
       console.log(`\nRefill: +${offer.onDemandAmountValue} added successfully.`);
       await saveSession(jar);
+      // Force fast polling after a refill to confirm the new balance
+      await saveState({ checkedAt: 0, remainKB: null, threshKB: 0 });
     } else {
       console.log(`\nRefill: failed — ${refill.message ?? JSON.stringify(refill)}`);
     }
