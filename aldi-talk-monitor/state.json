@@ -1,7 +1,12 @@
 {
-  "checkedAt": 0,
-  "remainKB": null,
-  "threshKB": 0,
-  "samples": [],
-  "nextCheckAt": 0
+  "checkedAt": 1774821412484,
+  "remainKB": 1924636,
+  "threshKB": 1048576,
+  "samples": [
+    {
+      "t": 1774821412484,
+      "kb": 1924636
+    }
+  ],
+  "nextCheckAt": 1774832212484
 }

@@ -121,6 +121,16 @@ function pick(f) {
   show();
 }
 
+function imgUrl(path) {
+  return '/files/' + path.split('/').map(encodeURIComponent).join('/');
+}
+
+function preload(imgs, from, count) {
+  for (let i = from; i < Math.min(from + count, imgs.length); i++) {
+    new Image().src = imgUrl(imgs[i]);
+  }
+}
+
 function show() {
   const imgs = data[folder] ?? [];
   if (!imgs.length) { img.style.display = 'none'; empty.style.display = ''; return; }
@@ -128,9 +138,10 @@ function show() {
   viewer.classList.remove('zoomed');
   img.style.display = '';
   empty.style.display = 'none';
-  img.src = '/files/' + imgs[idx].split('/').map(encodeURIComponent).join('/');
+  img.src = imgUrl(imgs[idx]);
   imgName.textContent = imgs[idx].split('/').pop();
   imgCounter.textContent = (idx + 1) + ' / ' + imgs.length;
+  preload(imgs, idx + 1, 3);
 }
 
 function setZoom(z) {
