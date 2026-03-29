@@ -112,6 +112,7 @@ in
       "--cap-add=SYS_ADMIN"
       "--device=/dev/fuse:/dev/fuse:rwm"
       "--security-opt=apparmor:unconfined"
+      "--dns=1.1.1.1"
       "--health-cmd=ls /data/remote/. 2>/dev/null"
       "--health-interval=10s"
       "--health-timeout=5s"
@@ -127,6 +128,7 @@ in
       "/mnt/stash-data:/data:slave"
     ];
     extraOptions = [
+      "--dns=1.1.1.1"
       "--health-cmd=test -f /config/.ready"
       "--health-interval=30s"
       "--health-timeout=5s"
