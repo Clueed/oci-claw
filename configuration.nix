@@ -15,6 +15,7 @@ in
     ./containers/nanoclaw.nix
     ./aldi-talk-monitor/aldi-talk-monitor.nix
     ./services/transmission.nix
+    ./services/image-gallery.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
