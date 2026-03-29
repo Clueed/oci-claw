@@ -3,6 +3,7 @@ import path from "path";
 
 const downloadsDir = process.argv[2] ?? "/var/lib/transmission/Downloads";
 const port = parseInt(process.argv[3] ?? "8766");
+const hostname = process.argv[4] ?? "0.0.0.0";
 
 const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp"]);
 
@@ -184,7 +185,7 @@ load();
 
 const server = Bun.serve({
   port,
-  hostname: "0.0.0.0",
+  hostname,
   async fetch(req) {
     const url = new URL(req.url);
 

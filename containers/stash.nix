@@ -154,7 +154,7 @@ in
       "stash-local:/data/local"
       "/mnt/stash-data:/data:slave"
     ];
-    ports = [ "9999:9999" ];
+    ports = [ "127.0.0.1:9999:9999" ];
     extraOptions = [
       "--security-opt=apparmor:unconfined"
       "--health-cmd=wget -q --spider http://localhost:9999/"
@@ -176,5 +176,5 @@ in
     requires = [ "podman-stash-config-sync.service" ];
   };
 
-  networking.firewall.allowedTCPPorts = [ 9999 ];
+  # Port 9999 is only accessible via tailscale serve (localhost-bound)
 }

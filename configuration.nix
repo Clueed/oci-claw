@@ -71,7 +71,7 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:stash --https=9999 127.0.0.1:9999";
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=9999 127.0.0.1:9999";
     };
   };
 

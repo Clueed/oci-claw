@@ -8,13 +8,13 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bun}/bin/bun run ${galleryScript} ${config.services.transmission.settings.download-dir} 8766";
+      ExecStart = "${pkgs.bun}/bin/bun run ${galleryScript} ${config.services.transmission.settings.download-dir} 8766 127.0.0.1";
       User = "transmission";
       Restart = "on-failure";
     };
   };
 
-  networking.firewall.allowedTCPPorts = [ 8766 ];
+  # Port 8766 is only accessible via tailscale serve (localhost-bound)
 
   systemd.services.tailscale-serve-gallery = {
     description = "Tailscale Serve for image gallery";
