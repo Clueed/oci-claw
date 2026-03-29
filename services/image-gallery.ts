@@ -112,6 +112,18 @@ async function load() {
     el.onclick = () => pick(f);
     folderList.appendChild(el);
   }
+  const hash = location.hash.slice(1);
+  if (hash) {
+    const slash = hash.lastIndexOf('/');
+    const f = decodeURIComponent(hash.slice(0, slash));
+    const i = parseInt(hash.slice(slash + 1));
+    if (data[f] && i >= 0 && i < data[f].length) {
+      folder = f; idx = i;
+      document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === f));
+      show();
+      return;
+    }
+  }
   if (folders.length) pick(folders[0]);
 }
 
@@ -140,6 +152,7 @@ function show() {
   img.src = imgUrl(imgs[idx]);
   imgName.textContent = imgs[idx].split('/').pop();
   imgCounter.textContent = (idx + 1) + ' / ' + imgs.length;
+  history.replaceState(null, '', '#' + encodeURIComponent(folder) + '/' + idx);
   preload(imgs, idx + 1, 3);
 }
 
