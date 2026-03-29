@@ -117,6 +117,7 @@ async function load() {
 
 function pick(f) {
   folder = f; idx = 0;
+  setZoom(1);
   document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === f));
   show();
 }
@@ -134,8 +135,6 @@ function preload(imgs, from, count) {
 function show() {
   const imgs = data[folder] ?? [];
   if (!imgs.length) { img.style.display = 'none'; empty.style.display = ''; return; }
-  zoom = 1; img.style.transform = '';
-  viewer.classList.remove('zoomed');
   img.style.display = '';
   empty.style.display = 'none';
   img.src = imgUrl(imgs[idx]);
