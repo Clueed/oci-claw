@@ -54,6 +54,7 @@ in
       speed-limit-up-enabled = true;
       peer-limit-global = 75;
       peer-limit-per-torrent = 25;
+      encryption = 2;
       "script-torrent-done-enabled" = true;
       "script-torrent-done-filename" = "${doneScript}";
     };
