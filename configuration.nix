@@ -14,6 +14,7 @@ in
     ./containers/stash.nix
     ./containers/nanoclaw.nix
     ./aldi-talk-monitor/aldi-talk-monitor.nix
+    ./services/transmission.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
