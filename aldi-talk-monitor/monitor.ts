@@ -16,10 +16,14 @@ const REFILL_URL   = `${BFF}/offer/updateUnlimited`;
 const SESSION_FILE = `${import.meta.dir}/session.json`;
 const STATE_FILE   = `${import.meta.dir}/state.json`;
 
-// When remainKB >= FAST_RATIO * threshKB, slow-poll (SLOW_INTERVAL_MS between runs).
-// Below that, the 15-min timer fires normally for prompt refill detection.
-const FAST_RATIO        = 1.5;
-const SLOW_INTERVAL_MS  = 2 * 60 * 60 * 1000; // 2 hours
+const API_STALENESS_MS  = 10 * 60 * 1000;        // 10 min worst-case API lag
+const SAFETY_MARGIN_MS  = 15 * 60 * 1000;        // staleness + buffer
+const MIN_POLL_MS       = 5 * 60 * 1000;         // 5 min (timer floor)
+const MAX_POLL_MS       = 3 * 60 * 60 * 1000;    // 3 hours
+const MAX_SAMPLES             = 8;
+const SAMPLE_MAX_AGE_MS       = 3 * 60 * 60 * 1000;  // 3 hours
+const PROXIMITY_STALE_N       = 3;                    // identical readings before backing off
+const PROXIMITY_STALE_POLL_MS = 15 * 60 * 1000;      // 15 min backoff when stuck near threshold
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
@@ -96,10 +100,17 @@ interface RefillResponse {
   message?: string;
 }
 
+interface Sample {
+  t: number;   // timestamp ms
+  kb: number;  // remainKB at that time
+}
+
 interface State {
   checkedAt: number;
   remainKB: number | null;
   threshKB: number;
+  samples: Sample[];   // rolling window of recent readings
+  nextCheckAt: number; // predicted ideal time for next check (ms epoch)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -120,11 +131,51 @@ async function saveState(state: State): Promise<void> {
   await Bun.write(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
+// Compute depletion rate in KB/ms from samples. Returns null if insufficient data.
+function computeRate(samples: Sample[]): number | null {
+  if (samples.length < 2) return null;
+  const first = samples[0];
+  const last  = samples[samples.length - 1];
+  const dt    = last.t - first.t;
+  if (dt <= 0) return null;
+
+  const windowRate = (first.kb - last.kb) / dt;
+
+  // Also compute recent rate from last two samples for responsiveness to bursts
+  const prev        = samples[samples.length - 2];
+  const dtRecent    = last.t - prev.t;
+  const recentRate  = dtRecent > 0 ? (prev.kb - last.kb) / dtRecent : windowRate;
+
+  // Use the higher (more conservative) rate when they diverge significantly
+  return recentRate > windowRate * 2 ? recentRate : 0.7 * recentRate + 0.3 * windowRate;
+}
+
+function computeNextCheckAt(now: number, remainKB: number, threshKB: number, samples: Sample[]): number {
+  // If we're within 20% of the threshold, check aggressively — unless the API value has been
+  // frozen across the last N samples, in which case back off to avoid hammering a stale endpoint
+  if (remainKB - threshKB < threshKB * 0.2) {
+    const recent = samples.slice(-PROXIMITY_STALE_N);
+    const stale  = recent.length >= PROXIMITY_STALE_N && recent.every(s => s.kb === remainKB);
+    return now + (stale ? PROXIMITY_STALE_POLL_MS : MIN_POLL_MS);
+  }
+
+  const rate = computeRate(samples);
+
+  if (rate === null || rate <= 0) {
+    // No data or idle — rate <= 0 means balance is stable or went up; check again at max interval
+    return now + MAX_POLL_MS;
+  }
+
+  const timeToThreshold = (remainKB - threshKB) / rate; // ms until crossing
+  const next = now + timeToThreshold - SAFETY_MARGIN_MS;
+  return Math.max(now + MIN_POLL_MS, Math.min(next, now + MAX_POLL_MS));
+}
+
 function shouldSkip(state: State | null): boolean {
   if (!state || state.remainKB === null) return false;
-  const age = Date.now() - state.checkedAt;
-  const aboveThreshold = state.remainKB >= FAST_RATIO * state.threshKB;
-  return aboveThreshold && age < SLOW_INTERVAL_MS;
+  if (state.remainKB < state.threshKB) return false;   // always check when at/below threshold
+  if (!state.nextCheckAt) return false;                 // no prediction yet
+  return Date.now() < state.nextCheckAt;
 }
 
 // ── Cookie jar ───────────────────────────────────────────────────────────────
@@ -433,8 +484,11 @@ async function main(): Promise<void> {
   // Adaptive polling: skip if balance was comfortable and checked recently
   const state = await loadState();
   if (shouldSkip(state)) {
-    const nextAt = new Date(state!.checkedAt + SLOW_INTERVAL_MS).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
-    process.stderr.write(`Balance OK (${toGB(state!.remainKB!)} GB > ${FAST_RATIO}× threshold) — next full check at ${nextAt}\n`);
+    const rate    = computeRate(state!.samples ?? []);
+    const rateStr = rate && rate > 0 ? `${(rate * 1000 * 3600 / 1024 / 1024).toFixed(2)} GB/h` : 'idle';
+    const nextAt  = new Date(state!.nextCheckAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
+    const inMin   = Math.round((state!.nextCheckAt - Date.now()) / 60000);
+    process.stderr.write(`Rate: ~${rateStr} — next check at ${nextAt} (in ${inMin}m)\n`);
     return;
   }
 
@@ -461,8 +515,28 @@ async function main(): Promise<void> {
 
   // Persist state for adaptive polling
   const primary = parsed[0];
-  if (primary) {
-    await saveState({ checkedAt: Date.now(), remainKB: primary.remainKB, threshKB: primary.threshKB });
+  if (primary && primary.remainKB !== null) {
+    const now      = Date.now();
+    const prevSamples: Sample[] = state?.samples ?? [];
+    const lastSample = prevSamples[prevSamples.length - 1];
+
+    // If balance went up (refill or renewal), clear history — old rate is meaningless
+    const balanceJumped = lastSample && primary.remainKB > lastSample.kb;
+    const baseSamples   = balanceJumped ? [] : prevSamples;
+
+    // Add current reading and prune old/excess samples
+    const newSample: Sample = { t: now, kb: primary.remainKB };
+    const samples = [...baseSamples, newSample]
+      .filter(s => now - s.t <= SAMPLE_MAX_AGE_MS)
+      .slice(-MAX_SAMPLES);
+
+    const nextCheckAt = computeNextCheckAt(now, primary.remainKB, primary.threshKB, samples);
+    const rate        = computeRate(samples);
+    const rateStr     = rate && rate > 0 ? `${(rate * 1000 * 3600 / 1024 / 1024).toFixed(2)} GB/h` : 'idle';
+    const inMin       = Math.round((nextCheckAt - now) / 60000);
+    process.stderr.write(`Consumption rate: ~${rateStr} (${samples.length} sample${samples.length !== 1 ? 's' : ''}) — next check in ${inMin}m\n`);
+
+    await saveState({ checkedAt: now, remainKB: primary.remainKB, threshKB: primary.threshKB, samples, nextCheckAt });
   }
 
   for (const { offer, refillAvailable } of parsed) {
@@ -473,8 +547,8 @@ async function main(): Promise<void> {
     if (refill.status === '200' && refill.isUpdated) {
       console.log(`\nRefill: +${offer.onDemandAmountValue} added successfully.`);
       await saveSession(jar);
-      // Force fast polling after a refill to confirm the new balance
-      await saveState({ checkedAt: 0, remainKB: null, threshKB: 0 });
+      // Force immediate recheck after refill; clear samples so stale rate isn't used
+      await saveState({ checkedAt: 0, remainKB: null, threshKB: 0, samples: [], nextCheckAt: 0 });
     } else {
       console.log(`\nRefill: failed — ${refill.message ?? JSON.stringify(refill)}`);
     }

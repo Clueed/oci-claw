@@ -28,8 +28,8 @@
     systemd.user.timers.aldi-talk-monitor = {
       Unit.Description = "ALDI TALK data balance checker timer";
       Timer = {
-        OnCalendar = "*:0/15";
-        RandomizedDelaySec = "5min";
+        OnCalendar = "*:0/5";
+        RandomizedDelaySec = "2min";
         Persistent = true;
       };
       Install.WantedBy = [ "timers.target" ];
