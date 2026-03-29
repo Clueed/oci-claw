@@ -14,6 +14,8 @@ in
     };
   };
 
+  networking.firewall.allowedTCPPorts = [ 8766 ];
+
   systemd.services.tailscale-serve-gallery = {
     description = "Tailscale Serve for image gallery";
     after = [ "tailscale-online.service" ];
@@ -22,7 +24,7 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent-gallery --https=8766 127.0.0.1:8766";
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=8766 127.0.0.1:8766";
     };
   };
 }
