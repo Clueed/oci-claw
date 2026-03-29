@@ -10,7 +10,7 @@ let
   mdCrmDir = "/home/claw/repos/md-crm";
 in
 {
-  sops.secrets.nanoclaw_anthropic_api_key = {
+  sops.secrets.nanoclaw_claude_oauth_token = {
     owner = "claw";
   };
 
@@ -29,21 +29,12 @@ in
   sops.templates."nanoclaw.env" = {
     owner = "claw";
     content = ''
-      ANTHROPIC_API_KEY=${config.sops.placeholder.nanoclaw_anthropic_api_key}
-      ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+      CLAUDE_CODE_OAUTH_TOKEN=${config.sops.placeholder.nanoclaw_claude_oauth_token}
       API_TIMEOUT_MS=3000000
-
-      # Not passed currently
-      ANTHROPIC_MODEL=glm-4.7
-      ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.5-Air
-      ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7
-      ANTHROPIC_DEFAULT_OPUS_MODEL=glm-5
-      CLAUDE_CODE_SUBAGENT_MODEL=glm-4.7
       DISABLE_TELEMETRY="1"
       CLAUDE_CODE_ENABLE_TELEMETRY="0"
       CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY="1"
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
-      SKIP_CLAUDE_API="1"
 
       TELEGRAM_BOT_TOKEN=${config.sops.placeholder.nanoclaw_telegram_token}
       GROQ_API_KEY=${config.sops.placeholder.nanoclaw_groq_api_key}
