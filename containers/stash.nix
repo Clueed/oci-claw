@@ -85,7 +85,10 @@ let
   '';
 in
 {
-  sops.secrets.rclone_config = { };
+  sops.secrets.rclone_config = {
+    group = "transmission";
+    mode = "0440";
+  };
 
   systemd.tmpfiles.rules = [
     "d /mnt/stash-data 0755 root root -"
