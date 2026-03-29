@@ -11,6 +11,10 @@
       rpc-whitelist-enabled = false;
       rpc-host-whitelist-enabled = false;
       incomplete-dir-enabled = true;
+      speed-limit-up = 300; # KB/s (~2.4 Mbps)
+      speed-limit-up-enabled = true;
+      peer-limit-global = 75;
+      peer-limit-per-torrent = 25;
     };
   };
 }
