@@ -87,6 +87,18 @@ in
     };
   };
 
+  systemd.services.tailscale-serve-opencode = {
+    description = "Tailscale Serve for OpenCode";
+    after = [ "tailscaled.service" ];
+    wants = [ "tailscaled.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:opencode --https=443 127.0.0.1:4096";
+    };
+  };
+
   nix.settings = {
     experimental-features = [
       "nix-command"
