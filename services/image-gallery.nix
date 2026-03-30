@@ -13,18 +13,4 @@ in
       Restart = "on-failure";
     };
   };
-
-  # Port 8766 is only accessible via tailscale serve (localhost-bound)
-
-  systemd.services.tailscale-serve-gallery = {
-    description = "Tailscale Serve for image gallery";
-    after = [ "tailscale-online.service" ];
-    requires = [ "tailscale-online.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=8766 127.0.0.1:8766";
-    };
-  };
 }

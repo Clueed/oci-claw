@@ -48,30 +48,42 @@ in
   services.tailscale = {
     enable = true;
     authKeyFile = config.sops.secrets.tailscale_auth_key.path;
+    extraUpFlags = [ "--advertise-tags=tag:claw" ];
   };
 
-  systemd.services.tailscale-online = {
-    description = "Wait for Tailscale connection";
-    after = [ "tailscaled.service" ];
-    requires = [ "tailscaled.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${pkgs.iputils}/bin/ping -c 1 -W 1 100.100.100.100";
-      Restart = "on-failure";
-      RestartSec = "1";
-    };
-  };
-
-  systemd.services.tailscale-serve = {
+  systemd.services.tailscale-serve-stash = {
     description = "Tailscale Serve for Stash";
-    after = [ "tailscale-online.service" ];
-    requires = [ "tailscale-online.service" ];
+    after = [ "tailscaled.service" ];
+    wants = [ "tailscaled.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=9999 127.0.0.1:9999";
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:stash --https=443 127.0.0.1:9999";
+    };
+  };
+
+  systemd.services.tailscale-serve-torrent-gallery = {
+    description = "Tailscale Serve for Torrent Gallery";
+    after = [ "tailscale-serve-stash.service" ];
+    requires = [ "tailscale-serve-stash.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent-gallery --https=443 127.0.0.1:8766";
+    };
+  };
+
+  systemd.services.tailscale-serve-torrent = {
+    description = "Tailscale Serve for Transmission";
+    after = [ "tailscale-serve-torrent-gallery.service" ];
+    requires = [ "tailscale-serve-torrent-gallery.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent --https=443 127.0.0.1:9091";
     };
   };
 

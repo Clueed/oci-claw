@@ -176,5 +176,5 @@ in
     requires = [ "podman-stash-config-sync.service" ];
   };
 
-  # Port 9999 is only accessible via tailscale serve (localhost-bound)
+  # Port 9999 is exposed via Tailscale Services (svc:stash)
 }
