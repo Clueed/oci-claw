@@ -42,7 +42,7 @@ in
   services.transmission = {
     enable = true;
     package = pkgs.transmission_4;
-    openRPCPort = true;
+    openRPCPort = false;
     openPeerPorts = true;
     settings = {
       rpc-bind-address = "127.0.0.1";
