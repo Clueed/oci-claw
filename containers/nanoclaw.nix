@@ -41,7 +41,6 @@ in
       TODOIST_API_KEY=${config.sops.placeholder.nanoclaw_todoist_api_key}
       ASSISTANT_NAME="Andy"
       MD_CRM_DIR=${mdCrmDir}
-      CREDENTIAL_PROXY_HOST=127.0.0.1
     '';
   };
 
@@ -108,6 +107,7 @@ in
         ExecStart = "${pkgs.bash}/bin/bash -l -c 'cd ${nanoclawDir} && exec node dist/index.js'";
         Restart = "on-failure";
         RestartSec = "10";
+        Environment = [ "CREDENTIAL_PROXY_HOST=127.0.0.1" ];
       };
       Install.WantedBy = [ "default.target" ];
     };
