@@ -45,7 +45,7 @@ in
     openRPCPort = true;
     openPeerPorts = true;
     settings = {
-      rpc-bind-address = "0.0.0.0";
+      rpc-bind-address = "127.0.0.1";
       rpc-authentication-required = false;
       rpc-whitelist-enabled = false;
       rpc-host-whitelist-enabled = false;

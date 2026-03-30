@@ -41,6 +41,7 @@ in
       TODOIST_API_KEY=${config.sops.placeholder.nanoclaw_todoist_api_key}
       ASSISTANT_NAME="Andy"
       MD_CRM_DIR=${mdCrmDir}
+      CREDENTIAL_PROXY_HOST=127.0.0.1
     '';
   };
 
