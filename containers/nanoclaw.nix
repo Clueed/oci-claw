@@ -107,7 +107,7 @@ in
         ExecStart = "${pkgs.bash}/bin/bash -l -c 'cd ${nanoclawDir} && exec node dist/index.js'";
         Restart = "on-failure";
         RestartSec = "10";
-        Environment = [ "CREDENTIAL_PROXY_HOST=127.0.0.1" ];
+        Environment = [ "CREDENTIAL_PROXY_HOST=0.0.0.0" ];
       };
       Install.WantedBy = [ "default.target" ];
     };
