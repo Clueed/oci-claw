@@ -137,7 +137,7 @@ in
   };
 
   virtualisation.oci-containers.containers.stash-app = {
-    image = "docker.io/stashapp/stash:v0.30.1";
+    image = "docker.io/stashapp/stash:v0.31.0";
     environment = {
       STASH_STASH = "/data";
       STASH_GENERATED = "/generated/";
