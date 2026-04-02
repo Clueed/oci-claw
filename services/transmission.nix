@@ -1,6 +1,20 @@
 { pkgs, ... }:
 let
-  videoExts = [ "mp4" "mkv" "avi" "mov" "wmv" "m4v" "ts" "webm" "flv" "mpg" "mpeg" "divx" "vob" ];
+  videoExts = [
+    "mp4"
+    "mkv"
+    "avi"
+    "mov"
+    "wmv"
+    "m4v"
+    "ts"
+    "webm"
+    "flv"
+    "mpg"
+    "mpeg"
+    "divx"
+    "vob"
+  ];
 
   doneScript = pkgs.writeShellScript "transmission-torrent-done" ''
     set -euo pipefail
@@ -55,6 +69,11 @@ in
       speed-limit-up-enabled = true;
       peer-limit-global = 75;
       peer-limit-per-torrent = 25;
+      dht-enabled = false;
+      pex-enabled = false;
+      lpd-enabled = false;
+      peer-port-random-on-start = true;
+      port-forwarding-enabled = false;
       encryption = 2;
       "script-torrent-done-enabled" = true;
       "script-torrent-done-filename" = "${doneScript}";
