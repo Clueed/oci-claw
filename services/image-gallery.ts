@@ -87,11 +87,15 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 #img-counter { margin-left: auto; flex-shrink: 0; }
 #viewer { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; position: relative; }
 #viewer.zoomed { cursor: zoom-out; }
+#viewer.scroll-mode { overflow-y: auto; align-items: flex-start; cursor: default; }
+#viewer.scroll-mode #current-img { max-width: none; max-height: none; width: 100%; object-fit: contain; }
 #current-img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; user-select: none; -webkit-user-drag: none; }
 #empty { color: #444; font-size: 16px; }
 #fav-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 2px 6px; color: #555; line-height: 1; }
 #fav-btn:hover { color: #aaa; }
 #fav-btn.active { color: #f0c040; }
+#mode-btn { background: none; border: none; font-size: 16px; cursor: pointer; padding: 2px 6px; color: #555; line-height: 1; }
+#mode-btn:hover { color: #aaa; }
 .folder.favorites-entry { color: #f0c040; }
 .folder.favorites-entry .folder-count { color: #886622; }
 .folder.favorites-entry.active { background: #3a3010; }
@@ -106,6 +110,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 <div id="main">
   <div id="toolbar">
     <button id="fav-btn" title="Toggle favorite (f)">☆</button>
+    <button id="mode-btn" title="Toggle view mode (m)">⊞</button>
     <span id="img-name">—</span>
     <span id="img-counter"></span>
   </div>
@@ -115,7 +120,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
   </div>
 </div>
 <script>
-let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false;
+let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false, scrollMode = false;
 const img = document.getElementById('current-img');
 const empty = document.getElementById('empty');
 const folderList = document.getElementById('folder-list');
@@ -123,6 +128,7 @@ const imgName = document.getElementById('img-name');
 const imgCounter = document.getElementById('img-counter');
 const viewer = document.getElementById('viewer');
 const favBtn = document.getElementById('fav-btn');
+const modeBtn = document.getElementById('mode-btn');
 
 async function load() {
   [data, favArr] = await Promise.all([
@@ -239,9 +245,20 @@ function show() {
 }
 
 function setZoom(z) {
+  if (scrollMode) return;
   zoom = Math.max(0.2, Math.min(5, z));
   img.style.transform = zoom === 1 ? '' : 'scale(' + zoom + ')';
   viewer.classList.toggle('zoomed', zoom > 1);
+}
+
+function toggleMode() {
+  scrollMode = !scrollMode;
+  viewer.classList.toggle('scroll-mode', scrollMode);
+  modeBtn.textContent = scrollMode ? '⊟' : '⊞';
+  if (scrollMode) {
+    setZoom(1);
+    viewer.scrollTop = 0;
+  }
 }
 
 document.addEventListener('keydown', e => {
@@ -255,11 +272,13 @@ document.addEventListener('keydown', e => {
   else if (e.key === '-') setZoom(zoom / 1.25);
   else if (e.key === '0') setZoom(1);
   else if (e.key === 'f') toggleFavorite();
+  else if (e.key === 'm') toggleMode();
 });
 
-viewer.addEventListener('wheel', e => { e.preventDefault(); setZoom(e.deltaY < 0 ? zoom * 1.1 : zoom / 1.1); }, { passive: false });
-viewer.addEventListener('click', () => setZoom(zoom > 1 ? 1 : 2));
+viewer.addEventListener('wheel', e => { if (scrollMode) return; e.preventDefault(); setZoom(e.deltaY < 0 ? zoom * 1.1 : zoom / 1.1); }, { passive: false });
+viewer.addEventListener('click', () => { if (!scrollMode) setZoom(zoom > 1 ? 1 : 2); });
 favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(); });
+modeBtn.addEventListener('click', e => { e.stopPropagation(); toggleMode(); });
 
 load();
 </script>
