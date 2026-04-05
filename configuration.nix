@@ -1,10 +1,7 @@
 {
   pkgs,
   config,
-  lib,
   opencode,
-  agent-skills,
-  local-skills,
   ...
 }:
 
@@ -128,14 +125,17 @@ in
   services.logrotate.checkConfig = false;
 
   boot.tmp.cleanOnBoot = true;
+  boot.enableContainers = true;
   zramSwap.enable = true;
   networking.hostName = "ociclaw-1";
   networking.domain = "";
-  networking.firewall.allowedTCPPorts = [
-    22
-    51413
-  ];
+  networking.firewall.allowedTCPPorts = [ 22 51413 ];
+  networking.firewall.trustedInterfaces = [ "tailscale0" ];
   networking.firewall.allowedUDPPorts = [ 51413 ];
+  networking.firewall.extraCommands = ''
+    iptables -t nat -C POSTROUTING -s 10.233.1.0/24 -j MASQUERADE 2>/dev/null || \
+    iptables -t nat -A POSTROUTING -s 10.233.1.0/24 -j MASQUERADE
+  '';
   services.openssh = {
     enable = true;
     settings = {
@@ -168,119 +168,80 @@ in
   ];
 
   home-manager.useGlobalPkgs = true;
-  home-manager.extraSpecialArgs = {
-    inherit agent-skills local-skills;
-  };
-  home-manager.users.claw =
-    { agent-skills, local-skills, ... }:
-    {
-      imports = [
-        agent-skills.homeManagerModules.default
-      ];
+  home-manager.users.claw = _: {
+    home.stateVersion = "25.11";
 
-      home.stateVersion = "25.11";
+    home.packages = [
+      pkgs.jq
+      (pkgs.writeShellScriptBin "devenv" (builtins.readFile ./devenvs/devenv.sh))
+      (pkgs.writeShellScriptBin "nh" ''
+        case "$1 $2" in
+          "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
+          "home switch"|"home test"|"home boot"|"home build"|\
+          "darwin switch"|"darwin test"|"darwin boot"|"darwin build")
+            exec ${pkgs.nh}/bin/nh "$1" "$2" --no-nom "''${@:3}"
+            ;;
+          *)
+            exec ${pkgs.nh}/bin/nh "$@"
+            ;;
+        esac
+      '')
+    ];
 
-      home.packages = [
-        pkgs.jq
-        (pkgs.writeShellScriptBin "nh" ''
-          case "$1 $2" in
-            "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
-            "home switch"|"home test"|"home boot"|"home build"|\
-            "darwin switch"|"darwin test"|"darwin boot"|"darwin build")
-              exec ${pkgs.nh}/bin/nh "$1" "$2" --no-nom "''${@:3}"
-              ;;
-            *)
-              exec ${pkgs.nh}/bin/nh "$@"
-              ;;
-          esac
-        '')
-      ];
+    programs.bash.enable = true;
+    programs.bash.initExtra = ''
+      export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
 
-      programs.bash.enable = true;
-      programs.bash.initExtra = ''
-        export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
+      opencode() {
+        if [ $# -eq 0 ]; then
+          command opencode attach http://localhost:4096
+        else
+          command opencode "$@"
+        fi
+      }
+    '';
 
-        opencode() {
-          if [ $# -eq 0 ]; then
-            command opencode attach http://localhost:4096
-          else
-            command opencode "$@"
-          fi
-        }
-      '';
-
-      programs.git = {
-        enable = true;
-        settings = {
-          user.name = "clueed-claw";
-          user.email = "clueed@proton.me";
-          credential.helper = "!gh auth git-credential";
-        };
-      };
-
-      home.file."AGENTS.md".text = ''
-        You are a system administration running on a NixOS system. Your job is to help manage and maintain this system.
-        - You have passwordless sudo access and can run any command as root.
-        - You manage NixOS configuration in /home/claw/nixos .
-        - You ONLY make changes by editing /home/claw/nixos/
-        - You NEVER use imperative commands to change system state.
-      '';
-
-      home.file."CLAUDE.md".text = "@AGENTS.md";
-
-      programs.agent-skills = {
-        enable = true;
-        sources.local = {
-          path = local-skills;
-          subdir = "";
-          filter.maxDepth = 1;
-        };
-        skills.enableAll = true;
-        targets.agents.enable = true;
-      };
-
-      home.file.".agents/skills/opencode-history/SKILL.md" = {
-        source = ./skills/opencode-history/SKILL.md;
-        force = true;
-      };
-      home.file.".agents/skills/opencode-history/scripts/list-sessions.sh" = {
-        source = ./skills/opencode-history/scripts/list-sessions.sh;
-        executable = true;
-        force = true;
-      };
-      home.file.".agents/skills/opencode-history/scripts/search-sessions.sh" = {
-        source = ./skills/opencode-history/scripts/search-sessions.sh;
-        executable = true;
-        force = true;
-      };
-      home.file.".agents/skills/opencode-history/scripts/view-session.sh" = {
-        source = ./skills/opencode-history/scripts/view-session.sh;
-        executable = true;
-        force = true;
-      };
-
-      home.file.".config/opencode/opencode.json".text = builtins.toJSON {
-        "$schema" = "https://opencode.ai/config.json";
-        autoupdate = false;
-        permission = "allow";
-      };
-
-      systemd.user.services.opencode-web = {
-        Unit = {
-          Description = "OpenCode Web Interface";
-          After = [ "network.target" ];
-        };
-        Service = {
-          # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
-          # This ensures spawned shells have access to system packages like gh for git credential helper
-          ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencode.packages.aarch64-linux.default}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
-          WorkingDirectory = "/home/claw";
-          Restart = "on-failure";
-          Type = "simple";
-        };
-        Install.WantedBy = [ "default.target" ];
+    programs.git = {
+      enable = true;
+      settings = {
+        user.name = "clueed-claw";
+        user.email = "clueed@proton.me";
+        credential.helper = "!gh auth git-credential";
       };
     };
+
+    home.file."AGENTS.md".text = ''
+      You are a system administration running on a NixOS system. Your job is to help manage and maintain this system.
+      - You have passwordless sudo access and can run any command as root.
+      - You manage NixOS configuration in /home/claw/nixos .
+      - You ONLY make changes by editing /home/claw/nixos/
+      - You NEVER use imperative commands to change system state.
+    '';
+
+    home.file."CLAUDE.md".text = "@AGENTS.md";
+
+    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      autoupdate = false;
+      permission = "allow";
+    };
+
+    systemd.user.services.opencode-web = {
+      Unit = {
+        Description = "OpenCode Web Interface";
+        After = [ "network.target" ];
+      };
+      Service = {
+        # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
+        # This ensures spawned shells have access to system packages like gh for git credential helper
+        ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencode.packages.aarch64-linux.default}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
+        WorkingDirectory = "/home/claw";
+        Restart = "on-failure";
+        Type = "simple";
+      };
+      Install.WantedBy = [ "default.target" ];
+    };
+  };
 
   system.stateVersion = "25.11";
 }
