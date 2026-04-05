@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  lib,
   opencode,
   ...
 }:
@@ -132,7 +133,7 @@ in
   networking.nat = {
     enable = true;
     internalInterfaces = [ "ve-+" ];
-    externalInterface = "enp0s6";
+    externalInterface = lib.mkDefault "enp0s6";
   };
   networking.firewall.allowedTCPPorts = [ 22 51413 ];
   services.openssh = {

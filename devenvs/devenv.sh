@@ -4,10 +4,10 @@ set -euo pipefail
 NIXOS_REPO="/home/claw/nixos"
 PROJECTS_DIR="/home/claw/projects"
 DEVENVS_DIR="/home/claw/devenvs"
-PORTS_FILE="$HOME/.devenvs/ports.json"
+PORTS_FILE="/home/claw/.devenvs/ports.json"
+LOCK_FILE="$PORTS_FILE.lock"
 PORT_START=4101
 PORT_END=4199
-OPENCODE_CONTAINER_PORT=  # unused; container uses same port as host
 
 usage() {
   cat <<EOF
@@ -38,21 +38,27 @@ ensure_ports_file() {
 allocate_port() {
   local name="$1"
   ensure_ports_file
-  # Check if already allocated
+
+  exec 200>"$LOCK_FILE"
+  flock 200
+
   local existing
   existing=$(jq -r ".allocations[\"$name\"] // empty" "$PORTS_FILE")
   if [[ -n "$existing" ]]; then
+    flock -u 200
     echo "$existing"
     return
   fi
   local port
   port=$(jq -r '.next_port' "$PORTS_FILE")
   if [[ "$port" -gt "$PORT_END" ]]; then
+    flock -u 200
     echo "error: port range $PORT_START-$PORT_END exhausted" >&2
     exit 1
   fi
   jq ".next_port = ($port + 1) | .allocations[\"$name\"] = $port" "$PORTS_FILE" > "${PORTS_FILE}.tmp"
   mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+  flock -u 200
   echo "$port"
 }
 
@@ -60,8 +66,14 @@ allocate_port() {
 free_port() {
   local name="$1"
   ensure_ports_file
+
+  exec 200>"$LOCK_FILE"
+  flock 200
+
   jq "del(.allocations[\"$name\"])" "$PORTS_FILE" > "${PORTS_FILE}.tmp"
   mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+
+  flock -u 200
 }
 
 # Generate the flake for a container
@@ -70,6 +82,13 @@ generate_flake() {
   local port="$2"
   local project_dir="$3"
   local flake_dir="$DEVENVS_DIR/$name"
+  local system_arch="${4:-$(uname -m)}"
+
+  case "$system_arch" in
+    x86_64) system_arch="x86_64-linux" ;;
+    aarch64) system_arch="aarch64-linux" ;;
+    arm64) system_arch="aarch64-linux" ;;
+  esac
 
   mkdir -p "$flake_dir"
 
@@ -96,7 +115,7 @@ generate_flake() {
     }:
     {
       nixosConfigurations."container" = nixpkgs.lib.nixosSystem {
-        system = "aarch64-linux";
+        system = "$SYSTEM_ARCH";
         specialArgs = {
           inherit opencode;
           opencodePort = $port;
@@ -126,7 +145,7 @@ write_nspawn_file() {
   sudo tee /etc/systemd/nspawn/"$name".nspawn > /dev/null <<NSPAWN
 [Files]
 Bind=$project_dir:/project
-Bind=$HOME/.cache/opencode:/home/dev/.cache/opencode
+Bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode
 NSPAWN
 }
 
@@ -158,6 +177,11 @@ cmd_create() {
   local project_dir="$PROJECTS_DIR/$name"
   local flake_dir="$DEVENVS_DIR/$name"
 
+  if [[ -e "$project_dir" ]]; then
+    echo "error: project directory '$project_dir' already exists" >&2
+    exit 1
+  fi
+
   if [[ -d "$flake_dir" ]]; then
     echo "error: devenv '$name' already exists" >&2
     exit 1
@@ -178,10 +202,21 @@ cmd_create() {
   port=$(allocate_port "$name")
 
   echo "Generating container flake (port $port)..."
-  generate_flake "$name" "$port" "$project_dir"
+  generate_flake "$name" "$port" "$project_dir" "$system_arch"
 
   echo "Writing bind mount config..."
   write_nspawn_file "$name" "$project_dir"
+
+  cleanup_on_failure() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+      echo "Failed, cleaning up..."
+      remove_nspawn_file "$name"
+      free_port "$name"
+      rm -rf "$flake_dir"
+    fi
+  }
+  trap cleanup_on_failure EXIT
 
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" \
@@ -190,6 +225,8 @@ cmd_create() {
 
   echo "Starting container..."
   sudo nixos-container start "$name"
+
+  trap - EXIT
 
   echo ""
   echo "Done! Dev environment '$name' is running."
@@ -214,7 +251,8 @@ cmd_destroy() {
   [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
 
   echo "Destroying container '$name'..."
-  sudo nixos-container destroy "$name" || true
+  sudo nixos-container destroy "$name" 2>/dev/null || true
+
   remove_nspawn_file "$name"
   rm -rf "$DEVENVS_DIR/$name"
   free_port "$name"
