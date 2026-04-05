@@ -129,13 +129,12 @@ in
   zramSwap.enable = true;
   networking.hostName = "ociclaw-1";
   networking.domain = "";
+  networking.nat = {
+    enable = true;
+    internalInterfaces = [ "ve-+" ];
+    externalInterface = "enp0s6";
+  };
   networking.firewall.allowedTCPPorts = [ 22 51413 ];
-  networking.firewall.trustedInterfaces = [ "tailscale0" ];
-  networking.firewall.allowedUDPPorts = [ 51413 ];
-  networking.firewall.extraCommands = ''
-    iptables -t nat -C POSTROUTING -s 10.233.1.0/24 -j MASQUERADE 2>/dev/null || \
-    iptables -t nat -A POSTROUTING -s 10.233.1.0/24 -j MASQUERADE
-  '';
   services.openssh = {
     enable = true;
     settings = {
