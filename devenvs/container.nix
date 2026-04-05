@@ -2,13 +2,15 @@
 # Receives via specialArgs: opencode (flake input), opencodePort, projectName
 {
   pkgs,
+  lib,
   opencode,
   opencodePort,
   projectName,
   ...
 }:
 let
-  opencodePkg = opencode.packages.aarch64-linux.default;
+  system = lib.mkSystem pkgs.system;
+  opencodePkg = opencode.packages.${system}.default;
 in
 {
   boot.isNspawnContainer = true;

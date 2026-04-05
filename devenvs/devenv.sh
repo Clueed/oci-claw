@@ -176,6 +176,8 @@ cmd_create() {
 
   local project_dir="$PROJECTS_DIR/$name"
   local flake_dir="$DEVENVS_DIR/$name"
+  local system_arch
+  system_arch=$(uname -m)
 
   if [[ -e "$project_dir" ]]; then
     echo "error: project directory '$project_dir' already exists" >&2
