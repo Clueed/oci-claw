@@ -9,7 +9,7 @@
   ...
 }:
 let
-  system = lib.mkSystem pkgs.system;
+  system = pkgs.stdenv.hostPlatform.system;
   opencodePkg = opencode.packages.${system}.default;
 in
 {
@@ -36,6 +36,39 @@ in
   ];
 
   networking.firewall.allowedTCPPorts = [ opencodePort ];
+
+  services.tailscale = {
+    enable = true;
+    extraDaemonFlags = [
+      "--state=mem:"
+      "--tun=userspace-networking"
+    ];
+  };
+
+  # Read TS_AUTHKEY from the file copied into the container rootfs by the host.
+  systemd.services.tailscaled-autoconnect = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "tailscaled.service" ];
+    wants = [ "tailscaled.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ pkgs.tailscale ];
+    script = ''
+      TS_AUTHKEY_FILE="/etc/secrets/ts_auth_key"
+      if [ ! -f "$TS_AUTHKEY_FILE" ]; then
+        echo "TS_AUTHKEY file not found at $TS_AUTHKEY_FILE" >&2
+        exit 1
+      fi
+      TS_AUTHKEY=$(cat "$TS_AUTHKEY_FILE")
+      if [ -z "$TS_AUTHKEY" ]; then
+        echo "TS_AUTHKEY is empty" >&2
+        exit 1
+      fi
+      tailscale up --auth-key "$TS_AUTHKEY" --force-reauth
+    '';
+  };
 
   systemd.tmpfiles.rules = [
     "d /project 0755 dev dev -"

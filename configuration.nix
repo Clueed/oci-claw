@@ -23,6 +23,7 @@ in
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
+  sops.secrets.tailscale_devenv_auth_key = { };
 
   system.activationScripts.ensure-nixos-repo = ''
     if [ ! -d /home/claw/nixos/.git ]; then
@@ -127,6 +128,22 @@ in
 
   boot.tmp.cleanOnBoot = true;
   boot.enableContainers = true;
+
+  # Copy TS_AUTHKEY into each container's rootfs before it starts.
+  # Reads container root from /etc/containers/<name>.conf, falling back to default.
+  # The container reads the key from /etc/secrets/ts_auth_key.
+  systemd.services."container@".serviceConfig.ExecStartPre = lib.mkAfter [
+    ''
+      ${pkgs.bash}/bin/bash -c '
+        ROOT=$(grep "^root=" /etc/containers/%i.conf 2>/dev/null | cut -d= -f2-)
+        ROOT=''${ROOT:-/var/lib/machines/%i}
+        mkdir -p "$ROOT/etc/secrets"
+        cp ${config.sops.secrets.tailscale_devenv_auth_key.path} "$ROOT/etc/secrets/ts_auth_key"
+        chmod 0600 "$ROOT/etc/secrets/ts_auth_key"
+      '
+    ''
+  ];
+
   zramSwap.enable = true;
   networking.hostName = "ociclaw-1";
   networking.domain = "";
@@ -135,7 +152,10 @@ in
     internalInterfaces = [ "ve-+" ];
     externalInterface = lib.mkDefault "enp0s6";
   };
-  networking.firewall.allowedTCPPorts = [ 22 51413 ];
+  networking.firewall.allowedTCPPorts = [
+    22
+    51413
+  ];
   services.openssh = {
     enable = true;
     settings = {
