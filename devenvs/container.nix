@@ -1,10 +1,12 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode (flake input), projectName
+# Receives via specialArgs: opencode (flake input), projectName, agent-skills, inputs
 {
   pkgs,
   lib,
   opencode,
   projectName,
+  agent-skills,
+  inputs,
   ...
 }:
 let
@@ -121,6 +123,24 @@ in
       };
     };
     services.vscode-server.enable = true;
+
+    programs.agent-skills = {
+      enable = true;
+      sources.anthropic = {
+        input = "anthropic-skills";
+        subdir = "skills";
+      };
+      sources.vercel = {
+        input = "vercel-agent-browser";
+        subdir = "skill";
+        idPrefix = "vercel";
+      };
+      skills.enable = [
+        "frontend-design"
+        "vercel/agent-browser"
+      ];
+      targets.opencode.enable = true;
+    };
   };
 
   # Make GH_TOKEN available in interactive shells via the bind-mounted secret

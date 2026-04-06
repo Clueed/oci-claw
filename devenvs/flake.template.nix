@@ -7,6 +7,15 @@
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     home-manager.url = "github:nix-community/home-manager/release-25.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    agent-skills.url = "github:Kyure-A/agent-skills-nix";
+    anthropic-skills = {
+      url = "github:anthropics/skills";
+      flake = false;
+    };
+    vercel-agent-browser = {
+      url = "github:vercel-labs/agent-browser";
+      flake = false;
+    };
   };
 
   outputs =
@@ -15,6 +24,7 @@
       opencode,
       vscode-server,
       home-manager,
+      agent-skills,
       ...
     }:
     {
@@ -23,6 +33,10 @@
         specialArgs = {
           inherit opencode;
           projectName = "@NAME@";
+          inherit agent-skills;
+          inputs = {
+            inherit (inputs) anthropic-skills vercel-agent-browser;
+          };
         };
         modules = [
           vscode-server.nixosModules.default
@@ -30,7 +44,10 @@
           { home-manager.useGlobalPkgs = true; }
           ./container.nix
           {
-            home-manager.users.dev.imports = [ vscode-server.homeModules.default ];
+            home-manager.users.dev.imports = [
+              vscode-server.homeModules.default
+              agent-skills.homeManagerModules.default
+            ];
           }
         ];
       };
