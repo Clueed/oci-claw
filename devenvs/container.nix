@@ -37,44 +37,52 @@ in
 
   networking.firewall.allowedTCPPorts = [ opencodePort ];
 
-  services.tailscale = {
-    enable = true;
-    extraDaemonFlags = [
-      "--state=mem:"
-      "--tun=userspace-networking"
-    ];
-  };
+  # services.tailscale = {
+  #   enable = true;
+  #   extraDaemonFlags = [
+  #     "--state=mem:"
+  #     "--tun=userspace-networking"
+  #   ];
+  # };
 
-  # Read TS_AUTHKEY from the file copied into the container rootfs by the host.
-  systemd.services.tailscaled-autoconnect = {
-    wantedBy = [ "multi-user.target" ];
-    after = [ "tailscaled.service" ];
-    wants = [ "tailscaled.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    path = [ pkgs.tailscale ];
-    script = ''
-      TS_AUTHKEY_FILE="/etc/secrets/ts_auth_key"
-      if [ ! -f "$TS_AUTHKEY_FILE" ]; then
-        echo "TS_AUTHKEY file not found at $TS_AUTHKEY_FILE" >&2
-        exit 1
-      fi
-      TS_AUTHKEY=$(cat "$TS_AUTHKEY_FILE")
-      if [ -z "$TS_AUTHKEY" ]; then
-        echo "TS_AUTHKEY is empty" >&2
-        exit 1
-      fi
-      tailscale up --auth-key "$TS_AUTHKEY" --force-reauth
-    '';
-  };
+  # # Read TS_AUTHKEY from the file copied into the container rootfs by the host.
+  # systemd.services.tailscaled-autoconnect = {
+  #   wantedBy = [ "multi-user.target" ];
+  #   after = [ "tailscaled.service" ];
+  #   wants = [ "tailscaled.service" ];
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     RemainAfterExit = true;
+  #   };
+  #   path = [ pkgs.tailscale ];
+  #   script = ''
+  #     TS_AUTHKEY_FILE="/etc/secrets/ts_auth_key"
+  #     if [ ! -f "$TS_AUTHKEY_FILE" ]; then
+  #       echo "TS_AUTHKEY file not found at $TS_AUTHKEY_FILE" >&2
+  #       exit 1
+  #     fi
+  #     TS_AUTHKEY=$(cat "$TS_AUTHKEY_FILE")
+  #     if [ -z "$TS_AUTHKEY" ]; then
+  #       echo "TS_AUTHKEY is empty" >&2
+  #       exit 1
+  #     fi
+  #     tailscale up --auth-key "$TS_AUTHKEY" --force-reauth
+  #   '';
+  # };
 
   systemd.tmpfiles.rules = [
     "d /project 0755 dev dev -"
   ];
 
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
+    bash
     git
     gh
     curl
@@ -90,6 +98,7 @@ in
       autoupdate = false;
       permission = "allow";
     };
+    services.vscode-server.enable = true;
   };
 
   systemd.services.opencode-web = {
@@ -98,7 +107,7 @@ in
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode web --hostname 0.0.0.0 --port ${toString opencodePort}'";
-      WorkingDirectory = "/project";
+      WorkingDirectory = "/home/dev";
       User = "dev";
       Restart = "on-failure";
       Type = "simple";

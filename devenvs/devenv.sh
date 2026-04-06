@@ -102,6 +102,7 @@ generate_flake() {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     opencode.url = "github:sst/opencode";
+    vscode-server.url = "github:nix-community/nixos-vscode-server";
     home-manager.url = "github:nix-community/home-manager/release-25.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -110,21 +111,26 @@ generate_flake() {
     {
       nixpkgs,
       opencode,
+      vscode-server,
       home-manager,
       ...
     }:
     {
       nixosConfigurations."container" = nixpkgs.lib.nixosSystem {
-        system = "$SYSTEM_ARCH";
+        system = "$system_arch";
         specialArgs = {
           inherit opencode;
           opencodePort = $port;
           projectName = "$name";
         };
         modules = [
+          vscode-server.nixosModules.default
           home-manager.nixosModules.home-manager
           { home-manager.useGlobalPkgs = true; }
           ./container.nix
+          {
+            home-manager.users.dev.imports = [ vscode-server.homeModules.default ];
+          }
         ];
       };
     };
@@ -141,11 +147,15 @@ FLAKE
 write_nspawn_file() {
   local name="$1"
   local project_dir="$2"
+  local port="$3"
   sudo mkdir -p /etc/systemd/nspawn
   sudo tee /etc/systemd/nspawn/"$name".nspawn > /dev/null <<NSPAWN
 [Files]
 Bind=$project_dir:/project
 Bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode
+
+[Network]
+Port=tcp:$port:$port
 NSPAWN
 }
 
@@ -207,7 +217,7 @@ cmd_create() {
   generate_flake "$name" "$port" "$project_dir" "$system_arch"
 
   echo "Writing bind mount config..."
-  write_nspawn_file "$name" "$project_dir"
+  write_nspawn_file "$name" "$project_dir" "$port"
 
   cleanup_on_failure() {
     local exit_code=$?
@@ -222,8 +232,7 @@ cmd_create() {
 
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" \
-    --flake "$flake_dir" \
-    --port "tcp:$port:$port"
+    --flake "$flake_dir"
 
   echo "Starting container..."
   sudo nixos-container start "$name"
