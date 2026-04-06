@@ -161,6 +161,7 @@ cmd_create() {
     if [[ $exit_code -ne 0 ]]; then
       echo "Failed, cleaning up..."
       rm -rf "$flake_dir"
+      rm -rf "$project_dir"
     fi
   }
   trap cleanup_on_failure EXIT
