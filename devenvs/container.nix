@@ -1,32 +1,15 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode, anthropic-skills, vercel-agent-browser, projectName
+# Receives via specialArgs: opencode, projectName
 {
   pkgs,
   lib,
   opencode,
-  anthropic-skills,
-  vercel-agent-browser,
   projectName,
   ...
 }:
 let
   system = pkgs.stdenv.hostPlatform.system;
   opencodePkg = opencode.packages.${system}.default;
-
-  opencodeConfig = pkgs.writeText "opencode.json" (
-    builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
-      autoupdate = false;
-      permission = "allow";
-    }
-  );
-
-  gitConfig = pkgs.writeText "gitconfig" ''
-    [credential]
-    	helper = !gh auth git-credential
-    [safe]
-    	directory = *
-  '';
 in
 {
   boot.isNspawnContainer = true;
@@ -97,22 +80,10 @@ in
     '';
   };
 
+  # Required for home-manager to work in nixos-container
   systemd.tmpfiles.rules = [
-    # Project bind-mount point
+    "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
     "d /${projectName} 0755 dev users -"
-    # Cache dir for opencode
-    "d /home/dev/.cache 0755 dev users -"
-    # OpenCode config
-    "d /home/dev/.config 0755 dev users -"
-    "d /home/dev/.config/opencode 0755 dev users -"
-    "L+ /home/dev/.config/opencode/opencode.json - - - - ${opencodeConfig}"
-    # Git config
-    "L+ /home/dev/.gitconfig - - - - ${gitConfig}"
-    # Agent skills
-    "d /home/dev/.opencode 0755 dev users -"
-    "d /home/dev/.opencode/skills 0755 dev users -"
-    "L+ /home/dev/.opencode/skills/frontend-design - - - - ${anthropic-skills}/skills/frontend-design"
-    "L+ /home/dev/.opencode/skills/agent-browser - - - - ${vercel-agent-browser}/skill/agent-browser"
   ];
 
   services.openssh = {
@@ -138,6 +109,22 @@ in
   environment.etc."profile.d/gh-token.sh".text = ''
     export GH_TOKEN=$(cat /etc/secrets/github_pat 2>/dev/null || true)
   '';
+
+  home-manager.users.dev = _: {
+    home.stateVersion = "25.11";
+    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      autoupdate = false;
+      permission = "allow";
+    };
+    programs.git = {
+      enable = true;
+      settings = {
+        credential.helper = "!gh auth git-credential";
+        safe.directory = "*";
+      };
+    };
+  };
 
   systemd.services.opencode-web = {
     description = "OpenCode Backend API Server";

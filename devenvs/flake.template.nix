@@ -4,32 +4,31 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     opencode.url = "github:sst/opencode";
-    anthropic-skills = {
-      url = "github:anthropics/skills";
-      flake = false;
-    };
-    vercel-agent-browser = {
-      url = "github:vercel-labs/agent-browser";
-      flake = false;
-    };
+    home-manager.url = "github:nix-community/home-manager/release-25.11";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
     {
       nixpkgs,
       opencode,
-      anthropic-skills,
-      vercel-agent-browser,
+      home-manager,
       ...
     }:
     {
       nixosConfigurations."container" = nixpkgs.lib.nixosSystem {
         system = "@SYSTEM@";
         specialArgs = {
-          inherit opencode anthropic-skills vercel-agent-browser;
+          inherit opencode;
           projectName = "@NAME@";
         };
-        modules = [ ./container.nix ];
+        modules = [
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+          }
+          ./container.nix
+        ];
       };
     };
 }
