@@ -113,15 +113,27 @@ in
       autoupdate = false;
       permission = "allow";
     };
+    programs.git = {
+      enable = true;
+      settings = {
+        credential.helper = "!gh auth git-credential";
+        safe.directory = "*";
+      };
+    };
     services.vscode-server.enable = true;
   };
+
+  # Make GH_TOKEN available in interactive shells via the bind-mounted secret
+  environment.etc."profile.d/gh-token.sh".text = ''
+    export GH_TOKEN=$(cat /etc/secrets/github_pat 2>/dev/null || true)
+  '';
 
   systemd.services.opencode-web = {
     description = "OpenCode Backend API Server";
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode serve --hostname 0.0.0.0 --port 4096'";
+      ExecStart = "${pkgs.bash}/bin/bash -c 'GH_TOKEN=$(cat /etc/secrets/github_pat) OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode serve --hostname 0.0.0.0 --port 4096'";
       WorkingDirectory = "/home/dev";
       User = "dev";
       Restart = "on-failure";

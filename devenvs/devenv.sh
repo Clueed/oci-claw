@@ -65,9 +65,10 @@ configure_container() {
   # Create mount point for secret file — nspawn requires the target to exist for file bind mounts
   sudo mkdir -p /var/lib/nixos-containers/"$name"/etc/secrets
   sudo touch /var/lib/nixos-containers/"$name"/etc/secrets/ts_auth_key
+  sudo touch /var/lib/nixos-containers/"$name"/etc/secrets/github_pat
 
   sudo tee -a "$conf" > /dev/null <<CONF
-EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/$name --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key
+EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/$name --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat
 CONF
 }
 
