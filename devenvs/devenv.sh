@@ -67,7 +67,7 @@ configure_container() {
   sudo touch /var/lib/nixos-containers/"$name"/etc/secrets/ts_auth_key
 
   sudo tee -a "$conf" > /dev/null <<CONF
-EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/project --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key
+EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/$name --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key
 CONF
 }
 

@@ -84,7 +84,7 @@ in
   };
 
   systemd.tmpfiles.rules = [
-    "d /project 0755 dev dev -"
+    "d ${projectName} 0755 dev dev -"
   ];
 
   services.openssh = {
