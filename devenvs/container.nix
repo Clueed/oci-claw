@@ -1,10 +1,13 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode, projectName
+# Receives via specialArgs: opencode (flake input), projectName, agent-skills, anthropic-skills, vercel-agent-browser
 {
   pkgs,
   lib,
   opencode,
   projectName,
+  agent-skills,
+  anthropic-skills,
+  vercel-agent-browser,
   ...
 }:
 let
@@ -47,6 +50,9 @@ in
   };
 
   # Auth key is bind-mounted read-only from the host at /etc/secrets/ts_auth_key.
+  # Uses a simple service (not oneshot) so it doesn't block multi-user.target boot,
+  # avoiding a deadlock where the host veth networking is only configured after the
+  # container signals readiness.
   systemd.services.tailscaled-autoconnect = {
     wantedBy = [ "multi-user.target" ];
     after = [
@@ -84,6 +90,8 @@ in
   systemd.tmpfiles.rules = [
     "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
     "d /${projectName} 0755 dev users -"
+    "d /home/dev 0755 dev users -"
+    "d /home/dev/.cache 0755 dev users -"
   ];
 
   services.openssh = {
@@ -123,6 +131,25 @@ in
         credential.helper = "!gh auth git-credential";
         safe.directory = "*";
       };
+    };
+    services.vscode-server.enable = true;
+
+    programs.agent-skills = {
+      enable = true;
+      sources.anthropic = {
+        input = "anthropic-skills";
+        subdir = "skills";
+      };
+      sources.vercel = {
+        input = "vercel-agent-browser";
+        subdir = "skills";
+        idPrefix = "vercel";
+      };
+      skills.enable = [
+        "frontend-design"
+        "vercel/agent-browser"
+      ];
+      targets.agents.enable = true;
     };
   };
 
