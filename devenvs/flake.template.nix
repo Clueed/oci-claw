@@ -36,14 +36,17 @@
           inherit opencode;
           projectName = "@NAME@";
           inherit agent-skills;
-          inputs = {
-            inherit anthropic-skills vercel-agent-browser;
-          };
+          inherit anthropic-skills vercel-agent-browser;
         };
         modules = [
           vscode-server.nixosModules.default
           home-manager.nixosModules.home-manager
-          { home-manager.useGlobalPkgs = true; }
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.extraSpecialArgs = {
+              inherit anthropic-skills vercel-agent-browser;
+            };
+          }
           ./container.nix
           {
             home-manager.users.dev.imports = [

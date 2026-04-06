@@ -1,12 +1,13 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode (flake input), projectName, agent-skills, inputs
+# Receives via specialArgs: opencode (flake input), projectName, agent-skills, anthropic-skills, vercel-agent-browser
 {
   pkgs,
   lib,
   opencode,
   projectName,
   agent-skills,
-  inputs,
+  anthropic-skills,
+  vercel-agent-browser,
   ...
 }:
 let
