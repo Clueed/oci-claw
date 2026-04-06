@@ -25,6 +25,8 @@
       vscode-server,
       home-manager,
       agent-skills,
+      anthropic-skills,
+      vercel-agent-browser,
       ...
     }:
     {
@@ -35,7 +37,7 @@
           projectName = "@NAME@";
           inherit agent-skills;
           inputs = {
-            inherit (inputs) anthropic-skills vercel-agent-browser;
+            inherit anthropic-skills vercel-agent-browser;
           };
         };
         modules = [
