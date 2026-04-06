@@ -17,6 +17,9 @@ Commands:
   destroy <name>                 Destroy container (project dir kept)
   list                           List environments and their status
   shell <name>                   Open a root shell in the container
+  rebuild <name>                Rebuild container from flake (fast update)
+  rebuildf <name>               Force rebuild: destroy & recreate
+  logs <name> [lines]            Show container journal (default 50)
 
 Options for create:
   --repo <url>   Clone this git repo (default: git init)
@@ -201,6 +204,47 @@ cmd_shell() {
   sudo nixos-container root-login "$name"
 }
 
+cmd_rebuild() {
+  local name="${1:-}"
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
+
+  local flake_dir="$DEVENVS_DIR/$name"
+  [[ ! -d "$flake_dir" ]] && { echo "error: devenv '$name' does not exist" >&2; exit 1; }
+
+  echo "Rebuilding container '$name'..."
+  sudo nixos-container update "$name" --flake "$flake_dir"
+
+  echo "Restarting systemd user service..."
+  sudo machinectl shell "$name" --reboot || true
+}
+
+cmd_rebuildf() {
+  local name="${1:-}"
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
+
+  local flake_dir="$DEVENVS_DIR/$name"
+  local project_dir="$PROJECTS_DIR/$name"
+
+  echo "Force rebuild: destroying container '$name'..."
+  sudo nixos-container destroy "$name" 2>/dev/null || true
+
+  echo "Regenerating flake and recreating..."
+  generate_flake "$name" "$project_dir" "$(uname -m)"
+
+  sudo nixos-container create "$name" --flake "$flake_dir"
+  configure_container "$name" "$project_dir"
+  sudo nixos-container start "$name"
+
+  echo "Done! Container rebuilt."
+}
+
+cmd_logs() {
+  local name="${1:-}"
+  local lines="${2:-50}"
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
+  sudo machinectl shell "$name" -- journalctl -n "$lines"
+}
+
 # Main dispatch
 [[ $# -eq 0 ]] && { usage; exit 1; }
 
@@ -211,6 +255,9 @@ case "$1" in
   destroy) shift; cmd_destroy "$@" ;;
   list)    cmd_list ;;
   shell)   shift; cmd_shell "$@" ;;
+  rebuild) shift; cmd_rebuild "$@" ;;
+  rebuildf) shift; cmd_rebuildf "$@" ;;
+  logs) shift; cmd_logs "$@" ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1" >&2; usage; exit 1 ;;
 esac

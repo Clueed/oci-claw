@@ -1,18 +1,32 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode (flake input), projectName, agent-skills, anthropic-skills, vercel-agent-browser
+# Receives via specialArgs: opencode, anthropic-skills, vercel-agent-browser, projectName
 {
   pkgs,
   lib,
   opencode,
-  projectName,
-  agent-skills,
   anthropic-skills,
   vercel-agent-browser,
+  projectName,
   ...
 }:
 let
   system = pkgs.stdenv.hostPlatform.system;
   opencodePkg = opencode.packages.${system}.default;
+
+  opencodeConfig = pkgs.writeText "opencode.json" (
+    builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      autoupdate = false;
+      permission = "allow";
+    }
+  );
+
+  gitConfig = pkgs.writeText "gitconfig" ''
+    [credential]
+    	helper = !gh auth git-credential
+    [safe]
+    	directory = *
+  '';
 in
 {
   boot.isNspawnContainer = true;
@@ -50,9 +64,6 @@ in
   };
 
   # Auth key is bind-mounted read-only from the host at /etc/secrets/ts_auth_key.
-  # Uses a simple service (not oneshot) so it doesn't block multi-user.target boot,
-  # avoiding a deadlock where the host veth networking is only configured after the
-  # container signals readiness.
   systemd.services.tailscaled-autoconnect = {
     wantedBy = [ "multi-user.target" ];
     after = [
@@ -87,7 +98,21 @@ in
   };
 
   systemd.tmpfiles.rules = [
-    "d ${projectName} 0755 dev dev -"
+    # Project bind-mount point
+    "d /${projectName} 0755 dev users -"
+    # Cache dir for opencode
+    "d /home/dev/.cache 0755 dev users -"
+    # OpenCode config
+    "d /home/dev/.config 0755 dev users -"
+    "d /home/dev/.config/opencode 0755 dev users -"
+    "L+ /home/dev/.config/opencode/opencode.json - - - - ${opencodeConfig}"
+    # Git config
+    "L+ /home/dev/.gitconfig - - - - ${gitConfig}"
+    # Agent skills
+    "d /home/dev/.opencode 0755 dev users -"
+    "d /home/dev/.opencode/skills 0755 dev users -"
+    "L+ /home/dev/.opencode/skills/frontend-design - - - - ${anthropic-skills}/skills/frontend-design"
+    "L+ /home/dev/.opencode/skills/agent-browser - - - - ${vercel-agent-browser}/skill/agent-browser"
   ];
 
   services.openssh = {
@@ -108,41 +133,6 @@ in
     nodejs_22
     opencodePkg
   ];
-
-  home-manager.users.dev = _: {
-    home.stateVersion = "25.11";
-    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
-      autoupdate = false;
-      permission = "allow";
-    };
-    programs.git = {
-      enable = true;
-      settings = {
-        credential.helper = "!gh auth git-credential";
-        safe.directory = "*";
-      };
-    };
-    services.vscode-server.enable = true;
-
-    programs.agent-skills = {
-      enable = true;
-      sources.anthropic = {
-        input = "anthropic-skills";
-        subdir = "skills";
-      };
-      sources.vercel = {
-        input = "vercel-agent-browser";
-        subdir = "skill";
-        idPrefix = "vercel";
-      };
-      skills.enable = [
-        "frontend-design"
-        "vercel/agent-browser"
-      ];
-      targets.opencode.enable = true;
-    };
-  };
 
   # Make GH_TOKEN available in interactive shells via the bind-mounted secret
   environment.etc."profile.d/gh-token.sh".text = ''
