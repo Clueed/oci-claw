@@ -10,23 +10,16 @@
     opencode.url = "github:sst/opencode";
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
-    agent-skills.url = "github:Kyure-A/agent-skills-nix";
-    local-skills = {
-      url = "path:/home/claw/nixos/skills";
-      flake = false;
-    };
   };
 
   outputs =
-    flake@{
+    {
       self,
       nixpkgs,
       home-manager,
       sops-nix,
       opencode,
       vscode-server, # pinned for devenv containers; not used by host
-      agent-skills,
-      local-skills,
       ...
     }:
     let
@@ -37,10 +30,7 @@
 
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = {
-          inherit opencode agent-skills;
-          local-skills = local-skills;
-        };
+        specialArgs = { inherit opencode; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
