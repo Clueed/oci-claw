@@ -1,10 +1,9 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode (flake input), opencodePort, projectName
+# Receives via specialArgs: opencode (flake input), projectName
 {
   pkgs,
   lib,
   opencode,
-  opencodePort,
   projectName,
   ...
 }:
@@ -38,8 +37,6 @@ in
       ];
     }
   ];
-
-  networking.firewall.allowedTCPPorts = [ opencodePort ];
 
   services.tailscale = {
     enable = true;
@@ -124,7 +121,7 @@ in
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode web --hostname 0.0.0.0 --port ${toString opencodePort}'";
+      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode web --hostname 0.0.0.0 --port 4096'";
       WorkingDirectory = "/home/dev";
       User = "dev";
       Restart = "on-failure";
