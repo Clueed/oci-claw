@@ -42,46 +42,10 @@ generate_flake() {
   # Copy container module so flake can import it with a relative path (no --impure needed)
   cp "$NIXOS_REPO/devenvs/container.nix" "$flake_dir/container.nix"
 
-  cat > "$flake_dir/flake.nix" <<FLAKE
-{
-  description = "Dev environment: $name";
-
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    opencode.url = "github:sst/opencode";
-    vscode-server.url = "github:nix-community/nixos-vscode-server";
-    home-manager.url = "github:nix-community/home-manager/release-25.11";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  outputs =
-    {
-      nixpkgs,
-      opencode,
-      vscode-server,
-      home-manager,
-      ...
-    }:
-    {
-      nixosConfigurations."container" = nixpkgs.lib.nixosSystem {
-        system = "$system_arch";
-        specialArgs = {
-          inherit opencode;
-          projectName = "$name";
-        };
-        modules = [
-          vscode-server.nixosModules.default
-          home-manager.nixosModules.home-manager
-          { home-manager.useGlobalPkgs = true; }
-          ./container.nix
-          {
-            home-manager.users.dev.imports = [ vscode-server.homeModules.default ];
-          }
-        ];
-      };
-    };
-}
-FLAKE
+  sed \
+    -e "s/@NAME@/$name/g" \
+    -e "s/@SYSTEM@/$system_arch/g" \
+    "$NIXOS_REPO/devenvs/flake.template.nix" > "$flake_dir/flake.nix"
 
   # Copy host flake.lock so we reuse already-cached store paths
   if [[ -f "$NIXOS_REPO/flake.lock" ]]; then
