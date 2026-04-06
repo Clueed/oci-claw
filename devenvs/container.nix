@@ -121,7 +121,7 @@ in
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode serve --hostname 0.0.0.0 --port 4096'";
+      ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode serve --hostname 0.0.0.0 --port 4096'";
       WorkingDirectory = "/home/dev";
       User = "dev";
       Restart = "on-failure";
