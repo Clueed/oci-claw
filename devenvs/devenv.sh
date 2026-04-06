@@ -143,26 +143,26 @@ FLAKE
   fi
 }
 
-# Write the nspawn override file for bind-mounting the project dir
-write_nspawn_file() {
+# Configure bind mounts and port forwarding in the nixos-containers conf file.
+# Must be called AFTER nixos-container create has written the conf file.
+# Note: nixos-container uses --keep-unit which causes systemd-nspawn to ignore
+# .nspawn drop-in files, so all extra flags must go through EXTRA_NSPAWN_FLAGS.
+configure_container() {
   local name="$1"
   local project_dir="$2"
   local port="$3"
-  sudo mkdir -p /etc/systemd/nspawn
-  sudo tee /etc/systemd/nspawn/"$name".nspawn > /dev/null <<NSPAWN
-[Files]
-Bind=$project_dir:/project
-Bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode
+  local conf="/etc/nixos-containers/$name.conf"
 
-[Network]
-Port=tcp:$port:$port
-NSPAWN
-}
+  # Enable port forwarding (replaces the empty HOST_PORT= written by nixos-container create)
+  sudo sed -i "s|^HOST_PORT=.*|HOST_PORT=tcp:$port:$port|" "$conf"
 
-# Remove nspawn override file
-remove_nspawn_file() {
-  local name="$1"
-  sudo rm -f /etc/systemd/nspawn/"$name".nspawn
+  # Create mount point for secret file — nspawn requires the target to exist for file bind mounts
+  sudo mkdir -p /var/lib/nixos-containers/"$name"/etc/secrets
+  sudo touch /var/lib/nixos-containers/"$name"/etc/secrets/ts_auth_key
+
+  sudo tee -a "$conf" > /dev/null <<CONF
+EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/project --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key
+CONF
 }
 
 cmd_create() {
@@ -216,14 +216,10 @@ cmd_create() {
   echo "Generating container flake (port $port)..."
   generate_flake "$name" "$port" "$project_dir" "$system_arch"
 
-  echo "Writing bind mount config..."
-  write_nspawn_file "$name" "$project_dir" "$port"
-
   cleanup_on_failure() {
     local exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
       echo "Failed, cleaning up..."
-      remove_nspawn_file "$name"
       free_port "$name"
       rm -rf "$flake_dir"
     fi
@@ -233,6 +229,9 @@ cmd_create() {
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" \
     --flake "$flake_dir"
+
+  echo "Configuring bind mounts and port forwarding..."
+  configure_container "$name" "$project_dir" "$port"
 
   echo "Starting container..."
   sudo nixos-container start "$name"
@@ -264,7 +263,6 @@ cmd_destroy() {
   echo "Destroying container '$name'..."
   sudo nixos-container destroy "$name" 2>/dev/null || true
 
-  remove_nspawn_file "$name"
   rm -rf "$DEVENVS_DIR/$name"
   free_port "$name"
 
