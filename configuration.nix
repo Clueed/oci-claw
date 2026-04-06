@@ -128,7 +128,10 @@ in
   zramSwap.enable = true;
   networking.hostName = "ociclaw-1";
   networking.domain = "";
-  networking.firewall.allowedTCPPorts = [ 22 51413 ];
+  networking.firewall.allowedTCPPorts = [
+    22
+    51413
+  ];
   networking.firewall.allowedUDPPorts = [ 51413 ];
   services.openssh = {
     enable = true;
@@ -211,6 +214,8 @@ in
     '';
 
     home.file."CLAUDE.md".text = "@AGENTS.md";
+
+    home.file.".agents/skills/opencode-history/SKILL.md".source = ./skills/opencode-history/SKILL.md;
 
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
