@@ -117,11 +117,11 @@ in
   };
 
   systemd.services.opencode-web = {
-    description = "OpenCode Web Interface";
+    description = "OpenCode Backend API Server";
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode web --hostname 0.0.0.0 --port 4096'";
+      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec ${opencodePkg}/bin/opencode serve --hostname 0.0.0.0 --port 4096'";
       WorkingDirectory = "/home/dev";
       User = "dev";
       Restart = "on-failure";
