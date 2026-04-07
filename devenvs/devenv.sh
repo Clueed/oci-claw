@@ -17,12 +17,16 @@ Commands:
   destroy <name>                 Destroy container (project dir kept)
   list                           List environments and their status
   shell <name>                   Open a root shell in the container
-  rebuild <name>                Rebuild container from flake (fast update)
-  rebuildf <name>               Force rebuild: destroy & recreate
-  logs <name> [lines]            Show container journal (default 50)
+  rebuild <name>                 Rebuild container from flake (stop/update/start)
+  rebuildf <name>                Force rebuild: destroy & recreate
+  logs <name> [lines] [service]  Show container journal (default 50 lines)
+  status <name>                  Show container health (services, mounts, tailscale)
+  exec <name> [--user <user>] <cmd...>  Run a command inside the container
 
 Options for create:
   --repo <url>   Clone this git repo (default: git init)
+Options for exec:
+  --user <user>  Run as this user (default: root)
 EOF
 }
 
@@ -204,6 +208,33 @@ cmd_shell() {
   sudo nixos-container root-login "$name"
 }
 
+# Run a command inside a container via machinectl shell.
+# machinectl shell requires absolute paths, so we wrap through bash -lc.
+# Usage: container_exec <name> [user@] "command string"
+container_exec() {
+  local name="$1"
+  local target="$2"
+  local cmd="$3"
+  [[ -z "$target" ]] && target="$name"
+  sudo machinectl shell "$target" /run/current-system/sw/bin/bash -lc "$cmd" 2>&1 | grep -v "^Connected to\|^Connection to\|^Press \^]" || true
+}
+
+# Wait for a container to reach running or degraded state
+wait_for_container() {
+  local name="$1"
+  local max_wait="${2:-30}"
+  local elapsed=0
+  while [[ $elapsed -lt $max_wait ]]; do
+    if container_exec "$name" "" "systemctl is-system-running" 2>/dev/null | grep -qE "running|degraded"; then
+      return 0
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  echo "warning: container '$name' did not become ready within ${max_wait}s" >&2
+  return 1
+}
+
 cmd_rebuild() {
   local name="${1:-}"
   [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
@@ -212,10 +243,14 @@ cmd_rebuild() {
   [[ ! -d "$flake_dir" ]] && { echo "error: devenv '$name' does not exist" >&2; exit 1; }
 
   echo "Rebuilding container '$name'..."
+  sudo nixos-container stop "$name" 2>/dev/null || true
   sudo nixos-container update "$name" --flake "$flake_dir"
+  sudo nixos-container start "$name"
 
-  echo "Restarting systemd user service..."
-  sudo machinectl shell "$name" --reboot || true
+  echo "Waiting for container to be ready..."
+  wait_for_container "$name"
+
+  echo "Done! Container '$name' rebuilt."
 }
 
 cmd_rebuildf() {
@@ -235,29 +270,107 @@ cmd_rebuildf() {
   configure_container "$name" "$project_dir"
   sudo nixos-container start "$name"
 
-  echo "Done! Container rebuilt."
+  echo "Waiting for container to be ready..."
+  wait_for_container "$name"
+
+  echo "Done! Container '$name' rebuilt."
 }
 
 cmd_logs() {
   local name="${1:-}"
   local lines="${2:-50}"
+  local service="${3:-}"
   [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
-  sudo machinectl shell "$name" -- journalctl -n "$lines"
+
+  if [[ -n "$service" ]]; then
+    container_exec "$name" "" "journalctl -u $service -n $lines --no-pager"
+  else
+    container_exec "$name" "" "journalctl -n $lines --no-pager"
+  fi
+}
+
+cmd_status() {
+  local name="${1:-}"
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
+
+  local status
+  status=$(sudo nixos-container status "$name" 2>/dev/null || echo "not found")
+  echo "Container: $name — $status"
+
+  if [[ "$status" != "running" && "$status" != "up" ]]; then
+    return
+  fi
+
+  echo ""
+  echo "Services:"
+  for svc in sshd tailscaled tailscaled-autoconnect opencode-web; do
+    local state
+    state=$(container_exec "$name" "" "systemctl is-active $svc" 2>/dev/null || echo "inactive")
+    printf "  %-30s %s\n" "$svc" "$state"
+  done
+
+  echo ""
+  echo "Bind mounts:"
+  container_exec "$name" "" "findmnt -rn -o TARGET,SOURCE" 2>/dev/null | grep -v "^/proc\|^/sys\|^/dev" || true
+
+  echo ""
+  echo "Tailscale:"
+  container_exec "$name" "" "tailscale status --self" 2>/dev/null || echo "  not connected"
+}
+
+cmd_exec() {
+  local name=""
+  local user=""
+  local cmd_args=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --user) user="$2"; shift 2 ;;
+      --) shift; break ;;
+      -*) echo "error: unknown option: $1" >&2; exit 1 ;;
+      *)
+        if [[ -z "$name" ]]; then
+          name="$1"
+        else
+          cmd_args+=("$1")
+        fi
+        shift
+        ;;
+    esac
+  done
+  # Collect remaining args after --
+  cmd_args+=("$@")
+
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
+  [[ ${#cmd_args[@]} -eq 0 ]] && { echo "error: command required" >&2; exit 1; }
+
+  local target
+  if [[ -n "$user" ]]; then
+    target="$user@$name"
+  else
+    target="$name"
+  fi
+
+  local cmd
+  cmd="${cmd_args[*]}"
+  container_exec "$name" "$target" "$cmd"
 }
 
 # Main dispatch
 [[ $# -eq 0 ]] && { usage; exit 1; }
 
 case "$1" in
-  create)  shift; cmd_create "$@" ;;
-  start)   shift; cmd_start "$@" ;;
-  stop)    shift; cmd_stop "$@" ;;
-  destroy) shift; cmd_destroy "$@" ;;
-  list)    cmd_list ;;
-  shell)   shift; cmd_shell "$@" ;;
-  rebuild) shift; cmd_rebuild "$@" ;;
+  create)   shift; cmd_create "$@" ;;
+  start)    shift; cmd_start "$@" ;;
+  stop)     shift; cmd_stop "$@" ;;
+  destroy)  shift; cmd_destroy "$@" ;;
+  list)     cmd_list ;;
+  shell)    shift; cmd_shell "$@" ;;
+  rebuild)  shift; cmd_rebuild "$@" ;;
   rebuildf) shift; cmd_rebuildf "$@" ;;
-  logs) shift; cmd_logs "$@" ;;
+  logs)     shift; cmd_logs "$@" ;;
+  status)   shift; cmd_status "$@" ;;
+  exec)     shift; cmd_exec "$@" ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1" >&2; usage; exit 1 ;;
 esac
