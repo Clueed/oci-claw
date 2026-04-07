@@ -6,6 +6,13 @@ PROJECTS_DIR="/home/claw/projects"
 DEVENVS_DIR="/home/claw/devenvs"
 OPENCODE_PORT=4096
 
+# Source centralized configuration
+if [[ -f "$DEVENVS_DIR/config.sh" ]]; then
+  source "$DEVENVS_DIR/config.sh" || true
+fi
+
+: "${PROJECT_MOUNT_PATH:=/}"
+
 usage() {
   cat <<EOF
 Usage: devenv <command> [args]
@@ -21,12 +28,13 @@ Commands:
   rebuildf <name>                Force rebuild: destroy & recreate
   logs <name> [lines] [service]  Show container journal (default 50 lines)
   status <name>                  Show container health (services, mounts, tailscale)
+  url <name> [--user <user>]    Generate VS Code Remote URL
   exec <name> [--user <user>] <cmd...>  Run a command inside the container
 
 Options for create:
   --repo <url>   Clone this git repo (default: git init)
-Options for exec:
-  --user <user>  Run as this user (default: root)
+Options for url/exec:
+  --user <user>  SSH user (default: dev)
 EOF
 }
 
@@ -51,6 +59,7 @@ generate_flake() {
 
   sed \
     -e "s/@NAME@/$name/g" \
+    -e "s/@MOUNT_PATH@/$PROJECT_MOUNT_PATH/g" \
     -e "s/@SYSTEM@/$system_arch/g" \
     "$NIXOS_REPO/devenvs/flake.template.nix" > "$flake_dir/flake.nix"
 
@@ -75,7 +84,7 @@ configure_container() {
   sudo touch /var/lib/nixos-containers/"$name"/etc/secrets/github_pat
 
   sudo tee -a "$conf" > /dev/null <<CONF
-EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/$name --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat
+EXTRA_NSPAWN_FLAGS=--bind=$project_dir:${PROJECT_MOUNT_PATH}$name --bind=/home/claw/.cache/opencode:/home/dev/.cache/opencode --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat
 CONF
 }
 
@@ -329,6 +338,68 @@ cmd_status() {
   container_exec "$name" "" "tailscale status --self" "" true || echo "  not connected"
 }
 
+get_tailscale_hostname() {
+  local name="$1"
+  local hostname
+  hostname=$(container_exec "$name" "" "hostname" "" true)
+  hostname="${hostname//$'\r'/}"
+  hostname="${hostname//$'\n'/}"
+  
+  if [[ -z "$hostname" ]]; then
+    return 1
+  fi
+  
+  local parent_domain
+  parent_domain=$(container_exec "$name" "" "awk '/^search/ {for(i=1;i<=NF;i++) if(\$i ~ /\./) {print \$i; exit}}' /etc/resolv.conf" "" true)
+  parent_domain="${parent_domain//$'\r'/}"
+  parent_domain="${parent_domain//$'\n'/}"
+  
+  if [[ -z "$parent_domain" ]]; then
+    echo "error: could not determine Tailscale DNS domain" >&2
+    return 1
+  fi
+  
+  printf "%s.%s" "$hostname" "$parent_domain"
+}
+
+cmd_url() {
+  local name="${1:-}"
+  local user="dev"
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --user) user="$2"; shift 2 ;;
+      -*) echo "Unknown option: $1" >&2; usage; exit 1 ;;
+      *) name="$1"; shift ;;
+    esac
+  done
+  
+  [[ -z "$name" ]] && { echo "error: container name required" >&2; usage; exit 1; }
+
+  local status
+  status=$(sudo nixos-container status "$name" 2>/dev/null || echo "not found")
+
+  if [[ "$status" != "running" && "$status" != "up" ]]; then
+    echo "Container '$name' is not running. Starting..."
+    sudo nixos-container start "$name"
+    echo "Waiting for container to be ready..."
+    wait_for_container "$name"
+  fi
+
+  local hostname
+  hostname=$(get_tailscale_hostname "$name")
+
+  if [[ -z "$hostname" ]]; then
+    echo "error: could not get container hostname" >&2
+    exit 1
+  fi
+
+  local project_path="${PROJECT_MOUNT_PATH}${name}"
+  local url="vscode://vscode-remote/ssh-remote+${user}@${hostname}${project_path}"
+
+  echo "$url"
+}
+
 cmd_exec() {
   local name=""
   local user=""
@@ -381,6 +452,7 @@ case "$1" in
   rebuildf) shift; cmd_rebuildf "$@" ;;
   logs)     shift; cmd_logs "$@" ;;
   status)   shift; cmd_status "$@" ;;
+  url)      shift; cmd_url "$@" ;;
   exec)     shift; cmd_exec "$@" ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1" >&2; usage; exit 1 ;;

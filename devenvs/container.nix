@@ -1,10 +1,11 @@
 # NixOS module for imperative dev environment containers.
-# Receives via specialArgs: opencode (flake input), projectName, agent-skills, anthropic-skills, vercel-agent-browser
+# Receives via specialArgs: opencode (flake input), projectName, projectMountPath, agent-skills, anthropic-skills, vercel-agent-browser
 {
   pkgs,
   lib,
   opencode,
   projectName,
+  projectMountPath,
   agent-skills,
   anthropic-skills,
   vercel-agent-browser,
@@ -89,7 +90,7 @@ in
   # Required for home-manager to work in nixos-container
   systemd.tmpfiles.rules = [
     "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
-    "d /${projectName} 0755 dev users -"
+    "d ${projectMountPath}${projectName} 0755 dev users -"
     "d /home/dev 0755 dev users -"
     "d /home/dev/.cache 0755 dev users -"
   ];

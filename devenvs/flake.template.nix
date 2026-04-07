@@ -35,6 +35,7 @@
         specialArgs = {
           inherit opencode;
           projectName = "@NAME@";
+          projectMountPath = "@MOUNT_PATH@";
           inherit agent-skills;
           inherit anthropic-skills vercel-agent-browser;
         };
