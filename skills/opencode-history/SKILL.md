@@ -26,69 +26,64 @@ OpenCode stores all data locally at `~/.local/share/opencode/`:
 - **SQLite DB**: `opencode-local.db` — ~44MB database with indexed data
 - **Logs**: `log/` — Per-session log files
 
-## How to list sessions
+## Scripts
+
+Three scripts are available at `~/.agents/skills/opencode-history/scripts/`:
+
+### list-sessions.sh
+
+List all sessions as JSON (sorted most recent first).
 
 ```bash
-# List all sessions (JSON format)
-opencode session list --format json
+# All sessions
+list-sessions.sh
 
-# List last N sessions
-opencode session list --format json -n 10
+# Filter by keyword in title (case-insensitive)
+list-sessions.sh -s "devenv"
 
-# List all sessions with title and directory
-opencode session list --format json | jq -r '.[] | "\(.id) | \(.title) | \(.directory)"'
+# Limit to N most recent
+list-sessions.sh -n 5
+
+# Combine both
+list-sessions.sh -s "nix" -n 10
 ```
 
-## How to export a session
+Output: JSON array of `{id, title, directory, created, updated}`. Pipe to `jq` for further filtering.
+
+### search-sessions.sh
+
+Search across all user messages in all sessions that have local storage.
 
 ```bash
-# Export a single session to JSON
-opencode export <sessionID>
+# Search for keyword
+search-sessions.sh "transmission"
 
-# Export and view in editor
-opencode export <sessionID> | less
+# Include N context messages before/after each match
+search-sessions.sh "transmission" -c 2
 ```
 
-## How to read messages directly from storage
+Output: JSON array of `{session_id, session_title, message_id, message_index, snippet, context_before, context_after}`.
 
-Each session has message files and part files:
+### view-session.sh
+
+Render a single session's conversation in plain text with role delimiters.
 
 ```bash
-# List sessions for a project
-ls ~/.local/share/opencode/storage/session/<projectHash>/
+# View session (user + assistant text + tool calls without output)
+view-session.sh <sessionID>
 
-# Read session metadata
-cat ~/.local/share/opencode/storage/session/<projectHash>/ses_<id>.json
-
-# List messages for a session
-ls ~/.local/share/opencode/storage/message/ses_<id>/
-
-# Read a message (metadata)
-cat ~/.local/share/opencode/storage/message/ses_<id>/msg_<id>.json
-
-# Read actual message content (text)
-cat ~/.local/share/opencode/storage/part/msg_<id>/prt_<id>.json
+# Include truncated tool output (200 chars)
+view-session.sh <sessionID> -t
 ```
 
-## How to search conversations
+Output: Plain text with `--- user ---`, `--- assistant ---`, and `--- tool: NAME ---` delimiters.
 
-```bash
-# Search all user messages across sessions for a keyword
-for msgDir in ~/.local/share/opencode/storage/message/*/; do
-  for msgFile in "$msgDir"*.json; do
-    role=$(jq -r '.role' "$msgFile" 2>/dev/null)
-    if [ "$role" = "user" ]; then
-      msgId=$(basename "$msgFile" .json)
-      for partFile in ~/.local/share/opencode/storage/part/"$msgId"/*.json; do
-        grep -l "KEYWORD" "$partFile" 2>/dev/null && echo "  Found in: $msgFile"
-      done
-    fi
-  done
-done
+## Typical workflow
 
-# Extract all text from exported session
-opencode export <sessionID> | jq -r '.messages[].parts[] | select(.type == "text") | .text'
-```
+1. **Find** - Use `list-sessions.sh -s KEYWORD` to find relevant sessions
+2. **Search** - Use `search-sessions.sh KEYWORD` for full-text search across messages
+3. **Read** - Use `view-session.sh <sessionID>` to review a specific conversation
+
 
 ## How to get stats
 

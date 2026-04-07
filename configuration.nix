@@ -216,6 +216,18 @@ in
     home.file."CLAUDE.md".text = "@AGENTS.md";
 
     home.file.".agents/skills/opencode-history/SKILL.md".source = ./skills/opencode-history/SKILL.md;
+    home.file.".agents/skills/opencode-history/scripts/list-sessions.sh" = {
+      source = ./skills/opencode-history/scripts/list-sessions.sh;
+      executable = true;
+    };
+    home.file.".agents/skills/opencode-history/scripts/search-sessions.sh" = {
+      source = ./skills/opencode-history/scripts/search-sessions.sh;
+      executable = true;
+    };
+    home.file.".agents/skills/opencode-history/scripts/view-session.sh" = {
+      source = ./skills/opencode-history/scripts/view-session.sh;
+      executable = true;
+    };
 
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
