@@ -215,18 +215,24 @@ in
 
     home.file."CLAUDE.md".text = "@AGENTS.md";
 
-    home.file.".agents/skills/opencode-history/SKILL.md".source = ./skills/opencode-history/SKILL.md;
+    home.file.".agents/skills/opencode-history/SKILL.md" = {
+      source = ./skills/opencode-history/SKILL.md;
+      force = true;
+    };
     home.file.".agents/skills/opencode-history/scripts/list-sessions.sh" = {
       source = ./skills/opencode-history/scripts/list-sessions.sh;
       executable = true;
+      force = true;
     };
     home.file.".agents/skills/opencode-history/scripts/search-sessions.sh" = {
       source = ./skills/opencode-history/scripts/search-sessions.sh;
       executable = true;
+      force = true;
     };
     home.file.".agents/skills/opencode-history/scripts/view-session.sh" = {
       source = ./skills/opencode-history/scripts/view-session.sh;
       executable = true;
+      force = true;
     };
 
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
