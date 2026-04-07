@@ -210,13 +210,24 @@ cmd_shell() {
 
 # Run a command inside a container via machinectl shell.
 # machinectl shell requires absolute paths, so we wrap through bash -lc.
-# Usage: container_exec <name> [user@] "command string"
+# Usage: container_exec <name> [user@] "command string" [ignore_errors]
 container_exec() {
   local name="$1"
   local target="$2"
   local cmd="$3"
+  local ignore_errors="${4:-false}"
   [[ -z "$target" ]] && target="$name"
-  sudo machinectl shell "$target" /run/current-system/sw/bin/bash -lc "$cmd" 2>&1 | grep -v "^Connected to\|^Connection to\|^Press \^]" || true
+  local tmpfile
+  tmpfile=$(mktemp)
+  set -o pipefail
+  sudo machinectl shell "$target" /run/current-system/sw/bin/bash -lc "$cmd" 2>&1 | grep -v "^Connected to\|^Connection to\|^Press \^]" > "$tmpfile"
+  local rc=$?
+  set +o pipefail
+  cat "$tmpfile"
+  rm -f "$tmpfile"
+  if [[ "$ignore_errors" != "true" && $rc -ne 0 ]]; then
+    return $rc
+  fi
 }
 
 # Wait for a container to reach running or degraded state
@@ -225,7 +236,7 @@ wait_for_container() {
   local max_wait="${2:-30}"
   local elapsed=0
   while [[ $elapsed -lt $max_wait ]]; do
-    if container_exec "$name" "" "systemctl is-system-running" 2>/dev/null | grep -qE "running|degraded"; then
+    if container_exec "$name" "" "systemctl is-system-running" "" true | grep -qE "running|degraded"; then
       return 0
     fi
     sleep 1
@@ -283,9 +294,9 @@ cmd_logs() {
   [[ -z "$name" ]] && { echo "error: container name required" >&2; exit 1; }
 
   if [[ -n "$service" ]]; then
-    container_exec "$name" "" "journalctl -u $service -n $lines --no-pager"
+    container_exec "$name" "" "journalctl -u $service -n $lines --no-pager" "" false
   else
-    container_exec "$name" "" "journalctl -n $lines --no-pager"
+    container_exec "$name" "" "journalctl -n $lines --no-pager" "" false
   fi
 }
 
@@ -305,17 +316,17 @@ cmd_status() {
   echo "Services:"
   for svc in sshd tailscaled tailscaled-autoconnect opencode-web; do
     local state
-    state=$(container_exec "$name" "" "systemctl is-active $svc" 2>/dev/null || echo "inactive")
-    printf "  %-30s %s\n" "$svc" "$state"
+    state=$(container_exec "$name" "" "systemctl is-active $svc" "" true)
+    printf "  %-30s %s\n" "$svc" "${state:-inactive}"
   done
 
   echo ""
   echo "Bind mounts:"
-  container_exec "$name" "" "findmnt -rn -o TARGET,SOURCE" 2>/dev/null | grep -v "^/proc\|^/sys\|^/dev" || true
+  container_exec "$name" "" "findmnt -rn -o TARGET,SOURCE" "" true | grep -v "^/proc\|^/sys\|^/dev" || true
 
   echo ""
   echo "Tailscale:"
-  container_exec "$name" "" "tailscale status --self" 2>/dev/null || echo "  not connected"
+  container_exec "$name" "" "tailscale status --self" "" true || echo "  not connected"
 }
 
 cmd_exec() {
