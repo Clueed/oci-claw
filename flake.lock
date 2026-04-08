@@ -2,8 +2,8 @@
   "nodes": {
     "agent-skills": {
       "inputs": {
-        "home-manager": "home-manager",
-        "nixpkgs": "nixpkgs"
+        "home-manager": "home-manager_2",
+        "nixpkgs": "nixpkgs_3"
       },
       "locked": {
         "lastModified": 1774607140,
@@ -16,6 +16,22 @@
       "original": {
         "owner": "Kyure-A",
         "repo": "agent-skills-nix",
+        "type": "github"
+      }
+    },
+    "agent-toolkit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772729184,
+        "narHash": "sha256-1q4IP55kvZhJibTLJct0SSifw46lBmAQhp9nSmDzYxs=",
+        "owner": "softaworks",
+        "repo": "agent-toolkit",
+        "rev": "3027f20f3181758385a1bb8c022d4041dfb4de84",
+        "type": "github"
+      },
+      "original": {
+        "owner": "softaworks",
+        "repo": "agent-toolkit",
         "type": "github"
       }
     },
@@ -40,27 +56,6 @@
     "home-manager": {
       "inputs": {
         "nixpkgs": [
-          "agent-skills",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1773608492,
-        "narHash": "sha256-QZteyExJYSQzgxqdsesDPbQgjctGG7iKV/6ooyQPITk=",
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "rev": "9a40ec3b78fc688d0908485887d355caa5666d18",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "type": "github"
-      }
-    },
-    "home-manager_2": {
-      "inputs": {
-        "nixpkgs": [
           "nixpkgs"
         ]
       },
@@ -79,11 +74,33 @@
         "type": "github"
       }
     },
+    "home-manager_2": {
+      "inputs": {
+        "nixpkgs": [
+          "skills-catalog",
+          "agent-skills",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1773608492,
+        "narHash": "sha256-QZteyExJYSQzgxqdsesDPbQgjctGG7iKV/6ooyQPITk=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "9a40ec3b78fc688d0908485887d355caa5666d18",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
     "local-skills": {
       "flake": false,
       "locked": {
-        "lastModified": 1775577028,
-        "narHash": "sha256-k0NCmLYByIvlSmHu0BSbmEholmN341h7SIbrZYYH4sU=",
+        "lastModified": 1775598710,
+        "narHash": "sha256-MeaZesbWitsYaSex3Ab3p2jAqQkrCp8+1EKiVkQ1LM4=",
         "path": "/home/claw/nixos/skills",
         "type": "path"
       },
@@ -93,22 +110,6 @@
       }
     },
     "nixpkgs": {
-      "locked": {
-        "lastModified": 1773520392,
-        "narHash": "sha256-Ra3l8zI7AYwaCxXcU4An8jAC1hhz/TEleXboJhWaBwY=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "f59e980846fe86cd831899cd032fdbd1d6054086",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
       "locked": {
         "lastModified": 1773375660,
         "narHash": "sha256-SEzUWw2Rf5Ki3bcM26nSKgbeoqi2uYy8IHVBqOKjX3w=",
@@ -124,7 +125,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1772091128,
         "narHash": "sha256-TnrYykX8Mf/Ugtkix6V+PjW7miU2yClA6uqWl/v6KWM=",
@@ -140,9 +141,25 @@
         "type": "github"
       }
     },
+    "nixpkgs_3": {
+      "locked": {
+        "lastModified": 1773520392,
+        "narHash": "sha256-Ra3l8zI7AYwaCxXcU4An8jAC1hhz/TEleXboJhWaBwY=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f59e980846fe86cd831899cd032fdbd1d6054086",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "opencode": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1773498426,
@@ -160,14 +177,29 @@
     },
     "root": {
       "inputs": {
-        "agent-skills": "agent-skills",
-        "home-manager": "home-manager_2",
-        "local-skills": "local-skills",
-        "nixpkgs": "nixpkgs_2",
+        "home-manager": "home-manager",
+        "nixpkgs": "nixpkgs",
         "opencode": "opencode",
+        "skills-catalog": "skills-catalog",
         "sops-nix": "sops-nix",
         "vscode-server": "vscode-server"
       }
+    },
+    "skills-catalog": {
+      "inputs": {
+        "agent-skills": "agent-skills",
+        "agent-toolkit": "agent-toolkit",
+        "local-skills": "local-skills"
+      },
+      "locked": {
+        "path": "./skills-catalog",
+        "type": "path"
+      },
+      "original": {
+        "path": "./skills-catalog",
+        "type": "path"
+      },
+      "parent": []
     },
     "sops-nix": {
       "inputs": {

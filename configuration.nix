@@ -3,8 +3,8 @@
   config,
   lib,
   opencode,
-  agent-skills,
-  local-skills,
+  skills-catalog,
+  inputs,
   ...
 }:
 
@@ -181,13 +181,17 @@ in
 
   home-manager.useGlobalPkgs = true;
   home-manager.extraSpecialArgs = {
-    inherit agent-skills local-skills;
+    inherit skills-catalog inputs;
   };
   home-manager.users.claw =
-    { agent-skills, local-skills, ... }:
+    {
+      skills-catalog,
+      inputs,
+      ...
+    }:
     {
       imports = [
-        agent-skills.homeManagerModules.default
+        skills-catalog.homeManagerModules.default
       ];
 
       home.stateVersion = "25.11";
@@ -240,17 +244,6 @@ in
       '';
 
       home.file."CLAUDE.md".text = "@AGENTS.md";
-
-      programs.agent-skills = {
-        enable = true;
-        sources.local = {
-          path = local-skills;
-          subdir = "";
-          filter.maxDepth = 1;
-        };
-        skills.enableAll = true;
-        targets.agents.enable = true;
-      };
 
       home.file.".config/opencode/opencode.json".text = builtins.toJSON {
         "$schema" = "https://opencode.ai/config.json";
