@@ -10,7 +10,6 @@
     sources.toolkit = {
       path = agent-toolkit;
       subdir = "skills";
-      idPrefix = "toolkit";
       filter.maxDepth = 1;
     };
     skills.enableAll = true;
