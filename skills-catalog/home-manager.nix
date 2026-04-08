@@ -2,6 +2,7 @@
 
 {
   programs.agent-skills = {
+    enable = true;
     sources.local = {
       path = local-skills;
       subdir = "";
@@ -10,6 +11,7 @@
     sources.toolkit = {
       path = agent-toolkit;
       subdir = "skills";
+      idPrefix = "toolkit";
       filter.maxDepth = 1;
     };
     skills.enableAll = true;
