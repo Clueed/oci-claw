@@ -4,6 +4,7 @@ set -euo pipefail
 NIXOS_REPO="/home/claw/nixos"
 PROJECTS_DIR="/home/claw/projects"
 DEVENVS_DIR="/home/claw/devenvs"
+CATALOG_DIR="$NIXOS_REPO/devenvs/catalog"
 OPENCODE_PORT=4096
 
 # Source centralized configuration
@@ -45,27 +46,37 @@ generate_flake() {
   local flake_dir="$DEVENVS_DIR/$name"
   local system_arch="${3:-$(uname -m)}"
 
-  case "$system_arch" in
-    x86_64) system_arch="x86_64-linux" ;;
-    aarch64) system_arch="aarch64-linux" ;;
-    arm64) system_arch="aarch64-linux" ;;
-    *) echo "error: unsupported architecture: $system_arch" >&2; exit 1 ;;
-  esac
-
   mkdir -p "$flake_dir"
 
-  # Copy container module so flake can import it with a relative path (no --impure needed)
-  cp "$NIXOS_REPO/devenvs/container.nix" "$flake_dir/container.nix"
+  cat > "$flake_dir/flake.nix" <<'EOF'
+{
+  description = "Dev environment: NAME";
 
-  sed \
-    -e "s/@NAME@/$name/g" \
-    -e "s/@MOUNT_PATH@/$PROJECT_MOUNT_PATH/g" \
-    -e "s/@SYSTEM@/$system_arch/g" \
-    "$NIXOS_REPO/devenvs/flake.template.nix" > "$flake_dir/flake.nix"
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    catalog.url = "path:CATALOG_DIR";
+    catalog.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager.url = "github:nix-community/home-manager/release-25.11";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    catalog.inputs.home-manager.follows = "home-manager";
+  };
 
-  # Copy host flake.lock so we reuse already-cached store paths
-  if [[ -f "$NIXOS_REPO/flake.lock" ]]; then
-    cp "$NIXOS_REPO/flake.lock" "$flake_dir/flake.lock"
+  outputs = inputs@{ catalog, ... }:
+    let
+      mkContainer = catalog.containers.SYSTEM;
+    in
+    {
+      nixosConfigurations.container = mkContainer "NAME" "MOUNT_PATH";
+    };
+}
+EOF
+  sed -i "s/NAME/$name/g" "$flake_dir/flake.nix"
+  sed -i "s|CATALOG_DIR|$CATALOG_DIR|g" "$flake_dir/flake.nix"
+  sed -i "s/SYSTEM/$system_arch/g" "$flake_dir/flake.nix"
+  sed -i "s|MOUNT_PATH|$PROJECT_MOUNT_PATH|g" "$flake_dir/flake.nix"
+
+  if [[ -f "$CATALOG_DIR/flake.lock" ]]; then
+    cp "$CATALOG_DIR/flake.lock" "$flake_dir/flake.lock"
   fi
 }
 
