@@ -14,7 +14,11 @@
       idPrefix = "toolkit";
       filter.maxDepth = 1;
     };
-    skills.enableAll = true;
+    skills.enable = [
+      "devenvs"
+      "opencode-history"
+      "toolkit/commit-work"
+    ];
     targets.agents.enable = true;
   };
 }
