@@ -216,6 +216,7 @@ in
     home.file."CLAUDE.md".text = "@AGENTS.md";
 
     home.file.".agents/skills/opencode-history/SKILL.md".source = ./skills/opencode-history/SKILL.md;
+    home.file.".agents/skills/opencode-history/SKILL.md".force = true;
 
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
