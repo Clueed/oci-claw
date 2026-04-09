@@ -8,7 +8,7 @@
 
 After making any change, follow this workflow:
 
-1. **Diff** - `nh os switch . --diff` to preview changes
+1. **Diff** - `nh os switch . --diff always` to preview changes
 2. **Confirm** - Summarize changes and get approval
 3. **Test** - `nh os test .` and verify system and changes work (fix or discuss if errors)
 4. **Commit** - `git add -A && git commit -m "msg"`
