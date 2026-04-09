@@ -149,6 +149,8 @@ in
       };
 
       home.packages = [
+        pkgs.vim
+
         (pkgs.writeShellScriptBin "nh" ''
           case "$1 $2" in
             "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
