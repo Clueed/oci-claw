@@ -64,6 +64,12 @@ in
 
   boot.enableContainers = true;
 
+  # Enable NAT and IP forwarding for devenv containers.
+  # The ve-+ pattern covers all virtual ethernet interfaces created by nixos-container.
+  networking.nat.enable = true;
+  networking.nat.internalInterfaces = [ "ve-+" ];
+  boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
+
   environment.systemPackages = [
     opencodePkg
     pkgs.gh

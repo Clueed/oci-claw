@@ -1,7 +1,10 @@
 # Base NixOS module for dev environment containers.
-# Receives via specialArgs: name (project name)
+# Receives via specialArgs: name (project name), opencode (flake input)
 # Project directory is bind-mounted from host via /etc/systemd/nspawn/<name>.nspawn.
-{ pkgs, name, ... }:
+{ pkgs, name, opencode, ... }:
+let
+  opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+in
 {
   boot.isNspawnContainer = true;
 
@@ -11,6 +14,7 @@
   users.users.dev = {
     isNormalUser = true;
     home = "/home/dev";
+    linger = true; # needed for user systemd services (opencode-web) to start at boot
     extraGroups = [ "wheel" ];
     hashedPassword = "!"; # no password login; SSH key only
     openssh.authorizedKeys.keys = [
@@ -39,6 +43,36 @@
     };
   };
 
+  # Each container joins Tailscale as an ephemeral node named after the project.
+  # Userspace networking avoids /dev/net/tun which isn't available in nspawn containers.
+  # Auth key is the container-specific ephemeral key bind-mounted from the host.
+  services.tailscale = {
+    enable = true;
+    authKeyFile = "/etc/secrets/ts_auth_key";
+    interfaceName = "userspace-networking";
+    # --timeout=30s: tailscale up fails fast if network isn't up yet.
+    # The container's ve-* network interface isn't available until AFTER the container sends
+    # systemd READY, which only happens after multi-user.target completes. So on first boot
+    # tailscale up will fail (no network yet), multi-user.target proceeds, READY is sent,
+    # the host brings up the veth interface, then the service retries and connects.
+    extraUpFlags = [ "--hostname=${name}" "--timeout=30s" ];
+  };
+
+  # Retry tailscale auth after failure so it reconnects once the network is actually up.
+  systemd.services.tailscaled-autoconnect.serviceConfig.Restart = "on-failure";
+  systemd.services.tailscaled-autoconnect.serviceConfig.RestartSec = "10s";
+
+  # VS Code server accessible via Tailscale on port 4000.
+  # withoutConnectionToken: Tailscale is the auth boundary.
+  services.openvscode-server = {
+    enable = true;
+    host = "0.0.0.0";
+    port = 4000;
+    withoutConnectionToken = true;
+    user = "dev";
+    group = "users";
+  };
+
   environment.systemPackages = with pkgs; [
     bash
     git
@@ -52,11 +86,13 @@
     export GH_TOKEN=$(cat /etc/secrets/github_pat 2>/dev/null || true)
   '';
 
-  # Required for home-manager to work in nixos-container
+  # Required for home-manager to work in nixos-container.
+  # /etc/secrets is created here so nspawn can bind-mount secrets into it at container start.
   systemd.tmpfiles.rules = [
     "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
     "d /home/dev 0755 dev users -"
     "d /home/dev/.cache 0755 dev users -"
+    "d /etc/secrets 0750 root root -"
   ];
 
   home-manager.useGlobalPkgs = true;
@@ -68,6 +104,20 @@
         credential.helper = "!gh auth git-credential";
         safe.directory = "*";
       };
+    };
+    # OpenCode web interface accessible via Tailscale on port 4096.
+    systemd.user.services.opencode-web = {
+      Unit = {
+        Description = "OpenCode Web Interface";
+        After = [ "network.target" ];
+      };
+      Service = {
+        ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode web --hostname 0.0.0.0 --port 4096'";
+        WorkingDirectory = "/home/dev";
+        Restart = "on-failure";
+        Type = "simple";
+      };
+      Install.WantedBy = [ "default.target" ];
     };
   };
 

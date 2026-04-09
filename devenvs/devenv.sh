@@ -72,16 +72,18 @@ EXTRA
   echo "Locking flake..."
   nix flake lock "$devenv_dir"
 
-  # Create nspawn config with bind-mounts for project dir and secrets
-  sudo tee "/etc/systemd/nspawn/$name.nspawn" > /dev/null <<NSPAWN
-[Files]
-Bind=$project_dir:/home/dev/$name
-BindReadOnly=/run/secrets/github_pat:/etc/secrets/github_pat
-BindReadOnly=/run/secrets/tailscale_auth_key:/etc/secrets/ts_auth_key
-NSPAWN
-
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" --flake "$devenv_dir"
+
+  # Create /etc/secrets so nspawn can bind-mount secrets into it.
+  sudo mkdir -p "/var/lib/nixos-containers/$name/etc/secrets"
+  sudo chmod 750 "/var/lib/nixos-containers/$name/etc/secrets"
+
+  # Append bind-mount flags to the container conf file.
+  # nixos-container uses EXTRA_NSPAWN_FLAGS which are passed directly to systemd-nspawn,
+  # which is more reliable than the .nspawn settings file for file bind-mounts.
+  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/run/secrets/tailscale_auth_key:/etc/secrets/ts_auth_key" \
+    | sudo tee -a "/etc/nixos-containers/$name.conf" > /dev/null
 
   echo "Starting container '$name'..."
   sudo nixos-container start "$name"
@@ -91,6 +93,9 @@ NSPAWN
   echo "  Shell:   devenv shell $name"
   echo "  Project: $project_dir"
   echo "  Config:  $devenv_dir/extra.nix"
+  echo "  Services (accessible via Tailscale once registered):"
+  echo "    OpenCode:  http://$name.<tailnet>:4096"
+  echo "    VS Code:   http://$name.<tailnet>:4000"
 }
 
 cmd_new() {

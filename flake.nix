@@ -30,7 +30,7 @@
         { name, extraModules ? [ ] }:
         nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          specialArgs = { inherit name; };
+          specialArgs = { inherit name opencode; };
           modules = [
             home-manager.nixosModules.home-manager
             ./devenvs/container.nix
