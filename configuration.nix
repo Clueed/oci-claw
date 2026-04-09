@@ -62,6 +62,8 @@ in
     };
   };
 
+  boot.enableContainers = true;
+
   environment.systemPackages = [
     opencodePkg
     pkgs.gh
