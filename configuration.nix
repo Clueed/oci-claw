@@ -8,6 +8,14 @@
 
 let
   mdCrmDir = "/home/claw/repos/md-crm";
+  opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  ensureRepo = owner: repo: dest: postClone: ''
+    if [ ! -d ${dest}/.git ]; then
+      mkdir -p $(dirname ${dest})
+      /run/wrappers/bin/su - claw -c 'GH_TOKEN=$(cat /run/secrets/github_pat) ${pkgs.git}/bin/git clone https://github.com/${owner}/${repo} ${dest}'
+      ${postClone}
+    fi
+  '';
 in
 {
   imports = [
@@ -24,25 +32,10 @@ in
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
 
-  system.activationScripts.ensure-nixos-repo = ''
-    if [ ! -d /home/claw/nixos/.git ]; then
-      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/oci-claw /home/claw/nixos'
-    fi
-  '';
-
-  system.activationScripts.ensure-nanoclaw-repo = ''
-    if [ ! -d /home/claw/nanoclaw/.git ]; then
-      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/nanoclaw /home/claw/nanoclaw'
-    fi
-  '';
-
-  system.activationScripts.ensure-md-crm-repo = ''
-    if [ ! -d ${mdCrmDir}/.git ]; then
-      mkdir -p $(dirname ${mdCrmDir})
-      /run/wrappers/bin/su - claw -c 'export GH_TOKEN=$(cat /run/secrets/github_pat); ${pkgs.git}/bin/git clone https://github.com/Clueed/md-crm.git ${mdCrmDir}'
-    fi
-    # Podman rootless maps host uid to root inside containers.
-    # The container's node user needs world-writable dirs to create/edit vault files.
+  system.activationScripts.ensure-nixos-repo   = ensureRepo "Clueed" "oci-claw"    "/home/claw/nixos"    "";
+  system.activationScripts.ensure-nanoclaw-repo = ensureRepo "Clueed" "nanoclaw"    "/home/claw/nanoclaw" "";
+  system.activationScripts.ensure-md-crm-repo   = ensureRepo "Clueed" "md-crm.git" mdCrmDir ''
+    # Podman rootless: container node user needs world-writable dirs to create/edit vault files.
     chmod 777 ${mdCrmDir} ${mdCrmDir}/People
   '';
 
@@ -52,53 +45,29 @@ in
     extraUpFlags = [ "--advertise-tags=tag:claw" ];
   };
 
-  systemd.services.tailscale-serve-stash = {
-    description = "Tailscale Serve for Stash";
+  systemd.services.tailscale-serve = {
+    description = "Tailscale Serve";
     after = [ "tailscaled.service" ];
     wants = [ "tailscaled.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:stash --https=443 127.0.0.1:9999";
+      ExecStart = pkgs.writeShellScript "tailscale-serve" ''
+        ${pkgs.tailscale}/bin/tailscale serve --service=svc:stash           --https=443 127.0.0.1:9999
+        ${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent-gallery --https=443 127.0.0.1:8766
+        ${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent         --https=443 127.0.0.1:9091
+        ${pkgs.tailscale}/bin/tailscale serve --service=svc:opencode        --https=443 127.0.0.1:4096
+      '';
     };
   };
 
-  systemd.services.tailscale-serve-torrent-gallery = {
-    description = "Tailscale Serve for Torrent Gallery";
-    after = [ "tailscale-serve-stash.service" ];
-    requires = [ "tailscale-serve-stash.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent-gallery --https=443 127.0.0.1:8766";
-    };
-  };
-
-  systemd.services.tailscale-serve-torrent = {
-    description = "Tailscale Serve for Transmission";
-    after = [ "tailscale-serve-torrent-gallery.service" ];
-    requires = [ "tailscale-serve-torrent-gallery.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent --https=443 127.0.0.1:9091";
-    };
-  };
-
-  systemd.services.tailscale-serve-opencode = {
-    description = "Tailscale Serve for OpenCode";
-    after = [ "tailscaled.service" ];
-    wants = [ "tailscaled.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --service=svc:opencode --https=443 127.0.0.1:4096";
-    };
-  };
+  environment.systemPackages = [
+    opencodePkg
+    pkgs.gh
+    pkgs.git
+    pkgs.sops
+  ];
 
   nix.settings = {
     experimental-features = [
@@ -128,7 +97,6 @@ in
   boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
   networking.hostName = "ociclaw-1";
-  networking.domain = "";
   networking.firewall.allowedTCPPorts = [
     22
     51413
@@ -241,7 +209,7 @@ in
         Service = {
           # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
           # This ensures spawned shells have access to system packages like gh for git credential helper
-          ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencode.packages.aarch64-linux.default}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
+          ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
           WorkingDirectory = "/home/claw";
           Restart = "on-failure";
           Type = "simple";

@@ -33,14 +33,6 @@
           ./configuration.nix
           home-manager.nixosModules.home-manager
           sops-nix.nixosModules.sops
-          {
-            environment.systemPackages = [
-              opencode.packages.aarch64-linux.default
-              pkgs.gh
-              pkgs.git
-              pkgs.sops
-            ];
-          }
         ];
       };
     };
