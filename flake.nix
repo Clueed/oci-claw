@@ -26,6 +26,17 @@
     {
       formatter.aarch64-linux = pkgs.nixfmt-tree;
 
+      lib.mkContainer =
+        { name, extraModules ? [ ] }:
+        nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          specialArgs = { inherit name; };
+          modules = [
+            home-manager.nixosModules.home-manager
+            ./devenvs/container.nix
+          ] ++ extraModules;
+        };
+
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
         specialArgs = { inherit opencode skills-catalog; };

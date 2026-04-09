@@ -67,6 +67,7 @@ in
     pkgs.gh
     pkgs.git
     pkgs.sops
+    pkgs.nixos-container
   ];
 
   nix.settings = {
@@ -150,6 +151,8 @@ in
 
       home.packages = [
         pkgs.vim
+
+        (pkgs.writeShellScriptBin "devenv" (builtins.readFile ./devenvs/devenv.sh))
 
         (pkgs.writeShellScriptBin "nh" ''
           case "$1 $2" in
