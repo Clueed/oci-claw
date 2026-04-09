@@ -2,6 +2,7 @@
   pkgs,
   config,
   opencode,
+  skills-catalog,
   ...
 }:
 
@@ -165,81 +166,84 @@ in
   ];
 
   home-manager.useGlobalPkgs = true;
-  home-manager.users.claw = _: {
-    home.stateVersion = "25.11";
+  home-manager.users.claw =
+    { pkgs, ... }:
+    {
+      imports = [
+        skills-catalog.homeManagerModules.default
+      ];
 
-    home.packages = [
-      (pkgs.writeShellScriptBin "nh" ''
-        case "$1 $2" in
-          "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
-          "home switch"|"home test"|"home boot"|"home build"|\
-          "darwin switch"|"darwin test"|"darwin boot"|"darwin build")
-            exec ${pkgs.nh}/bin/nh "$1" "$2" --no-nom "''${@:3}"
-            ;;
-          *)
-            exec ${pkgs.nh}/bin/nh "$@"
-            ;;
-        esac
-      '')
-    ];
+      home.stateVersion = "25.11";
 
-    programs.bash.enable = true;
-    programs.bash.initExtra = ''
-      export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
+      home.packages = [
+        (pkgs.writeShellScriptBin "nh" ''
+          case "$1 $2" in
+            "os switch"|"os test"|"os boot"|"os build"|"os build-vm"|\
+            "home switch"|"home test"|"home boot"|"home build"|\
+            "darwin switch"|"darwin test"|"darwin boot"|"darwin build")
+              exec ${pkgs.nh}/bin/nh "$1" "$2" --no-nom "''${@:3}"
+              ;;
+            *)
+              exec ${pkgs.nh}/bin/nh "$@"
+              ;;
+          esac
+        '')
+      ];
 
-      opencode() {
-        if [ $# -eq 0 ]; then
-          command opencode attach http://localhost:4096
-        else
-          command opencode "$@"
-        fi
-      }
-    '';
+      programs.bash.enable = true;
+      programs.bash.initExtra = ''
+        export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
 
-    programs.git = {
-      enable = true;
-      settings = {
-        user.name = "clueed-claw";
-        user.email = "clueed@proton.me";
-        credential.helper = "!gh auth git-credential";
+        opencode() {
+          if [ $# -eq 0 ]; then
+            command opencode attach http://localhost:4096
+          else
+            command opencode "$@"
+          fi
+        }
+      '';
+
+      programs.git = {
+        enable = true;
+        settings = {
+          user.name = "clueed-claw";
+          user.email = "clueed@proton.me";
+          credential.helper = "!gh auth git-credential";
+        };
+      };
+
+      home.file."AGENTS.md".text = ''
+        You are a system administration running on a NixOS system. Your job is to help manage and maintain this system.
+        - You have passwordless sudo access and can run any command as root.
+        - You manage NixOS configuration in /home/claw/nixos .
+        - You ONLY make changes by editing /home/claw/nixos/
+        - You NEVER use imperative commands to change system state.
+      '';
+
+      home.file."CLAUDE.md".text = "@AGENTS.md";
+
+      home.file.".config/opencode/opencode.json".text = builtins.toJSON {
+        "$schema" = "https://opencode.ai/config.json";
+        autoupdate = false;
+        permission = "allow";
+      };
+
+      systemd.user.services.opencode-web = {
+        Unit = {
+          Description = "OpenCode Web Interface";
+          After = [ "network.target" ];
+        };
+        Service = {
+          # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
+          # This ensures spawned shells have access to system packages like gh for git credential helper
+          ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencode.packages.aarch64-linux.default}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
+          WorkingDirectory = "/home/claw";
+          Restart = "on-failure";
+          Type = "simple";
+        };
+        Install.WantedBy = [ "default.target" ];
       };
     };
-
-    home.file."AGENTS.md".text = ''
-      You are a system administration running on a NixOS system. Your job is to help manage and maintain this system.
-      - You have passwordless sudo access and can run any command as root.
-      - You manage NixOS configuration in /home/claw/nixos .
-      - You ONLY make changes by editing /home/claw/nixos/
-      - You NEVER use imperative commands to change system state.
-    '';
-
-    home.file."CLAUDE.md".text = "@AGENTS.md";
-
-    home.file.".agents/skills/opencode-history/SKILL.md".source = ./skills/opencode-history/SKILL.md;
-    home.file.".agents/skills/opencode-history/SKILL.md".force = true;
-
-    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
-      autoupdate = false;
-      permission = "allow";
-    };
-
-    systemd.user.services.opencode-web = {
-      Unit = {
-        Description = "OpenCode Web Interface";
-        After = [ "network.target" ];
-      };
-      Service = {
-        # Use login shell to source /etc/profile → /etc/set-environment for full NixOS PATH
-        # This ensures spawned shells have access to system packages like gh for git credential helper
-        ExecStart = "${pkgs.bash}/bin/bash -l -c 'OPENCODE_ENABLE_EXA=1 exec ${opencode.packages.aarch64-linux.default}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
-        WorkingDirectory = "/home/claw";
-        Restart = "on-failure";
-        Type = "simple";
-      };
-      Install.WantedBy = [ "default.target" ];
-    };
-  };
 
   system.stateVersion = "25.11";
 }

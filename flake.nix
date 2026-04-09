@@ -8,6 +8,7 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     opencode.url = "github:sst/opencode";
+    skills-catalog.url = "path:./skills";
   };
 
   outputs =
@@ -17,6 +18,7 @@
       home-manager,
       sops-nix,
       opencode,
+      skills-catalog,
     }:
     let
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
@@ -26,7 +28,7 @@
 
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = { inherit opencode; };
+        specialArgs = { inherit opencode skills-catalog; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager
