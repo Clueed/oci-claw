@@ -175,6 +175,11 @@ in
 
       home.stateVersion = "25.11";
 
+      home.sessionVariables = {
+        EDITOR = "vi";
+        VISUAL = "vi";
+      };
+
       home.packages = [
         (pkgs.writeShellScriptBin "nh" ''
           case "$1 $2" in
