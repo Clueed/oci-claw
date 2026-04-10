@@ -33,7 +33,7 @@ _create_container() {
   # Set up project directory
   if [ -n "$repo_url" ]; then
     echo "Cloning $repo_url into $project_dir..."
-    GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true) git clone "$repo_url" "$project_dir"
+    git clone "$repo_url" "$project_dir"
   else
     mkdir -p "$project_dir"
     git -C "$project_dir" init -q
@@ -90,7 +90,7 @@ EXTRA
   # Append bind-mount flags to the container conf file.
   # nixos-container uses EXTRA_NSPAWN_FLAGS which are passed directly to systemd-nspawn,
   # which is more reliable than the .nspawn settings file for file bind-mounts.
-  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key" \
+  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key" \
     | sudo tee -a "/etc/nixos-containers/$name.conf" > /dev/null
 
   echo "Starting container '$name'..."
@@ -118,10 +118,13 @@ cmd_clone() {
 
 cmd_rebuild() {
   local name=${1:?'Usage: devenv rebuild <name>'}
-  local devenv_dir="$PROJECTS_DIR/$name/.devenv"
+  local project_dir="$PROJECTS_DIR/$name"
+  local devenv_dir="$project_dir/.devenv"
   echo "Rebuilding container '$name'..."
+  git -C "$project_dir" add .devenv
   nix flake update --flake "$devenv_dir"
   sudo nixos-container update "$name"
+  git -C "$project_dir" reset HEAD .devenv 2>/dev/null || true
   echo "  VS Code:  $(cmd_code "$name")"
 }
 

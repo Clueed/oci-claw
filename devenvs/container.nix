@@ -103,8 +103,10 @@ in
     bun
   ];
 
-  # Make GH_TOKEN available in interactive shells via the bind-mounted secret
-  environment.etc."profile.d/gh-token.sh".text = ''
+  # Make GH_TOKEN available in login shells via the bind-mounted secret.
+  # NixOS's /etc/profile sources /etc/profile.local (not profile.d/).
+  # gh auth on the host uses GH_TOKEN (PAT), not the hosts.yml keyring entry.
+  environment.etc."profile.local".text = ''
     export GH_TOKEN=$(cat /etc/secrets/github_pat 2>/dev/null || true)
   '';
 
@@ -114,12 +116,14 @@ in
     "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
     "d /home/dev 0755 dev users -"
     "d /home/dev/.cache 0755 dev users -"
-    "d /etc/secrets 0750 root root -"
+    "d /etc/secrets 0751 root root -"
   ];
 
   home-manager.useGlobalPkgs = true;
   home-manager.users.dev = _: {
     home.stateVersion = "25.11";
+    # identity comes from the bind-mounted host ~/.gitconfig;
+    # credential helper uses GH_TOKEN set by gh-token.sh.
     programs.git = {
       enable = true;
       settings = {
