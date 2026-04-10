@@ -126,6 +126,7 @@ in
     programs.agent-skills.skills.enable = [
       "opencode-history"
       "commit-work"
+      "agent-browser"
     ];
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
