@@ -69,8 +69,14 @@ FLAKE
 }
 EXTRA
 
+  # Stage .devenv files so Nix can evaluate them (it refuses untracked files in git repos).
+  git -C "$project_dir" add "$devenv_dir"
+
   echo "Locking flake..."
   nix flake lock "$devenv_dir"
+
+  # Unstage so we don't pollute the project's git index.
+  git -C "$project_dir" reset HEAD "$devenv_dir" 2>/dev/null || true
 
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" --flake "$devenv_dir"
