@@ -36,6 +36,7 @@ _create_container() {
     GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true) git clone "$repo_url" "$project_dir"
   else
     mkdir -p "$project_dir"
+    git -C "$project_dir" init -q
   fi
 
   mkdir -p "$devenv_dir"
