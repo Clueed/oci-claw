@@ -1,9 +1,10 @@
 # Base NixOS module for dev environment containers.
 # Receives via specialArgs: name (project name), opencode (flake input)
 # Project directory is bind-mounted from host via /etc/systemd/nspawn/<name>.nspawn.
-{ pkgs, lib, name, opencode, authorizedKeys, ... }:
+{ pkgs, lib, name, opencode, llm-agents, authorizedKeys, ... }:
 let
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  agentBrowser = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.agent-browser;
 in
 {
   boot.isNspawnContainer = true;
@@ -76,6 +77,7 @@ in
     gh
     curl
     jq
+    agentBrowser
   ];
 
   # Make GH_TOKEN available in interactive shells via the bind-mounted secret

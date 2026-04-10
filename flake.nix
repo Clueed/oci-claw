@@ -8,6 +8,7 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     opencode.url = "github:sst/opencode";
+    llm-agents.url = "github:numtide/llm-agents.nix";
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
     skills-catalog.url = "path:./skills";
@@ -20,6 +21,7 @@
       home-manager,
       sops-nix,
       opencode,
+      llm-agents,
       vscode-server,
       skills-catalog,
     }:
@@ -36,7 +38,7 @@
         { name, extraModules ? [ ] }:
         nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          specialArgs = { inherit name opencode authorizedKeys; };
+          specialArgs = { inherit name opencode llm-agents authorizedKeys; };
           modules = [
             home-manager.nixosModules.home-manager
             vscode-server.nixosModules.default
