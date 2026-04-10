@@ -287,6 +287,7 @@
         "nixpkgs": "nixpkgs_2",
         "opencode": "opencode",
         "skills-catalog": "skills-catalog",
+        "softaworks-toolkit": "softaworks-toolkit",
         "sops-nix": "sops-nix",
         "vscode-server": "vscode-server"
       }
@@ -304,6 +305,22 @@
         "type": "path"
       },
       "parent": []
+    },
+    "softaworks-toolkit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772729184,
+        "narHash": "sha256-1q4IP55kvZhJibTLJct0SSifw46lBmAQhp9nSmDzYxs=",
+        "owner": "softaworks",
+        "repo": "agent-toolkit",
+        "rev": "3027f20f3181758385a1bb8c022d4041dfb4de84",
+        "type": "github"
+      },
+      "original": {
+        "owner": "softaworks",
+        "repo": "agent-toolkit",
+        "type": "github"
+      }
     },
     "sops-nix": {
       "inputs": {

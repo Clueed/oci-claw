@@ -121,9 +121,13 @@ in
   ];
 
   home-manager.useGlobalPkgs = true;
+  home-manager.extraSpecialArgs = { inherit softaworks-toolkit; };
   home-manager.users.dev = _: {
     imports = [ "${skills-catalog}/sources.nix" ];
-    programs.agent-skills.skills.enable = [ "opencode-history" ];
+    programs.agent-skills.skills.enable = [
+      "opencode-history"
+      "commit-work"
+    ];
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
     # credential helper uses GH_TOKEN set by gh-token.sh.

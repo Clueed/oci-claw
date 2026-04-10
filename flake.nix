@@ -12,6 +12,10 @@
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
     skills-catalog.url = "path:./skills";
+    softaworks-toolkit = {
+      url = "github:softaworks/agent-toolkit";
+      flake = false;
+    };
   };
 
   outputs =
@@ -24,6 +28,7 @@
       llm-agents,
       vscode-server,
       skills-catalog,
+      softaworks-toolkit,
     }:
     let
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
@@ -38,7 +43,7 @@
         { name, extraModules ? [ ] }:
         nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          specialArgs = { inherit name opencode llm-agents authorizedKeys skills-catalog; };
+          specialArgs = { inherit name opencode llm-agents authorizedKeys skills-catalog softaworks-toolkit; };
           modules = [
             home-manager.nixosModules.home-manager
             vscode-server.nixosModules.default
@@ -48,7 +53,7 @@
 
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = { inherit opencode skills-catalog authorizedKeys; };
+        specialArgs = { inherit opencode skills-catalog authorizedKeys softaworks-toolkit; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager

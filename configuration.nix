@@ -4,6 +4,7 @@
   opencode,
   authorizedKeys,
   skills-catalog,
+  softaworks-toolkit,
   ...
 }:
 
@@ -143,6 +144,7 @@ in
   ];
 
   home-manager.useGlobalPkgs = true;
+  home-manager.extraSpecialArgs = { inherit softaworks-toolkit; };
   home-manager.users.claw =
     { pkgs, ... }:
     {

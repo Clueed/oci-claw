@@ -3,6 +3,10 @@
 
   inputs = {
     agent-skills.url = "github:Kyure-A/agent-skills-nix";
+    softaworks-toolkit = {
+      url = "github:softaworks/agent-toolkit";
+      flake = false;
+    };
   };
 
   outputs =
