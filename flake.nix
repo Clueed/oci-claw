@@ -38,7 +38,7 @@
         { name, extraModules ? [ ] }:
         nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          specialArgs = { inherit name opencode llm-agents authorizedKeys; };
+          specialArgs = { inherit name opencode llm-agents authorizedKeys skills-catalog; };
           modules = [
             home-manager.nixosModules.home-manager
             vscode-server.nixosModules.default
