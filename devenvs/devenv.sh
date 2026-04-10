@@ -82,7 +82,7 @@ EXTRA
   # Append bind-mount flags to the container conf file.
   # nixos-container uses EXTRA_NSPAWN_FLAGS which are passed directly to systemd-nspawn,
   # which is more reliable than the .nspawn settings file for file bind-mounts.
-  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/run/secrets/tailscale_auth_key:/etc/secrets/ts_auth_key" \
+  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key" \
     | sudo tee -a "/etc/nixos-containers/$name.conf" > /dev/null
 
   echo "Starting container '$name'..."

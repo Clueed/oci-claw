@@ -31,6 +31,7 @@ in
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
+  sops.secrets.tailscale_devenv_auth_key = { };
 
   system.activationScripts.ensure-nixos-repo   = ensureRepo "Clueed" "oci-claw"    "/home/claw/nixos"    "";
   system.activationScripts.ensure-nanoclaw-repo = ensureRepo "Clueed" "nanoclaw"    "/home/claw/nanoclaw" "";

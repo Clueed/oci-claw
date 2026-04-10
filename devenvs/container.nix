@@ -1,7 +1,7 @@
 # Base NixOS module for dev environment containers.
 # Receives via specialArgs: name (project name), opencode (flake input)
 # Project directory is bind-mounted from host via /etc/systemd/nspawn/<name>.nspawn.
-{ pkgs, name, opencode, ... }:
+{ pkgs, lib, name, opencode, ... }:
 let
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
 in
@@ -58,7 +58,13 @@ in
     extraUpFlags = [ "--hostname=${name}" "--timeout=30s" ];
   };
 
-  # Retry tailscale auth after failure so it reconnects once the network is actually up.
+  # The tailscaled-autoconnect service is Type=notify by default, meaning multi-user.target
+  # waits for it to send READY (which only happens when Tailscale reaches Running state).
+  # In nspawn containers the ve-* veth interface isn't up until AFTER the container sends its
+  # own READY, causing a deadlock. Switching to Type=simple lets multi-user.target proceed
+  # immediately so the host can bring up the veth, after which Tailscale connects and the
+  # service keeps looping until it detects Running state.
+  systemd.services.tailscaled-autoconnect.serviceConfig.Type = lib.mkForce "simple";
   systemd.services.tailscaled-autoconnect.serviceConfig.Restart = "on-failure";
   systemd.services.tailscaled-autoconnect.serviceConfig.RestartSec = "10s";
 
