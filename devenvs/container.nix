@@ -1,7 +1,15 @@
 # Base NixOS module for dev environment containers.
 # Receives via specialArgs: name (project name), opencode (flake input)
 # Project directory is bind-mounted from host via /etc/systemd/nspawn/<name>.nspawn.
-{ pkgs, lib, name, opencode, llm-agents, authorizedKeys, ... }:
+{
+  pkgs,
+  lib,
+  name,
+  opencode,
+  llm-agents,
+  authorizedKeys,
+  ...
+}:
 let
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
   agentBrowser = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.agent-browser;
@@ -54,7 +62,10 @@ in
     # systemd READY, which only happens after multi-user.target completes. So on first boot
     # tailscale up will fail (no network yet), multi-user.target proceeds, READY is sent,
     # the host brings up the veth interface, then the service retries and connects.
-    extraUpFlags = [ "--hostname=${name}" "--timeout=30s" ];
+    extraUpFlags = [
+      "--hostname=${name}"
+      "--timeout=30s"
+    ];
   };
 
   # The tailscaled-autoconnect service is Type=notify by default, meaning multi-user.target
@@ -63,6 +74,11 @@ in
   # own READY, causing a deadlock. Switching to Type=simple lets multi-user.target proceed
   # immediately so the host can bring up the veth, after which Tailscale connects and the
   # service keeps looping until it detects Running state.
+  # restartIfChanged=false: during `nixos-container update` (switch-to-configuration test),
+  # restarting tailscaled-autoconnect runs `tailscale up` which fails transiently (daemon busy
+  # or network not ready), causing switch-to-configuration to exit non-zero and the reload to
+  # fail with NOPERMISSION. The service is already connected at this point; no restart needed.
+  systemd.services.tailscaled-autoconnect.restartIfChanged = false;
   systemd.services.tailscaled-autoconnect.serviceConfig.Type = lib.mkForce "simple";
   systemd.services.tailscaled-autoconnect.serviceConfig.Restart = "on-failure";
   systemd.services.tailscaled-autoconnect.serviceConfig.RestartSec = "10s";
@@ -78,6 +94,9 @@ in
     curl
     jq
     agentBrowser
+    nodejs
+    pnpm
+    bun
   ];
 
   # Make GH_TOKEN available in interactive shells via the bind-mounted secret
