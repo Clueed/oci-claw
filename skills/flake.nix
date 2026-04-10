@@ -10,7 +10,12 @@
   };
 
   outputs =
-    { self, agent-skills, ... }:
+    {
+      self,
+      agent-skills,
+      softaworks-toolkit,
+      ...
+    }:
     {
       # Sources only — registers the agent-skills option and declares sources/targets.
       # Consumers set their own skills.enable.
@@ -19,6 +24,10 @@
           agent-skills.homeManagerModules.default
           ./sources.nix
         ];
+        config.programs.agent-skills.sources.softaworks = {
+          path = softaworks-toolkit;
+          subdir = "skills";
+        };
       };
 
       # Full host config — sources + host skill selection.
@@ -27,6 +36,10 @@
           agent-skills.homeManagerModules.default
           ./home-manager.nix
         ];
+        config.programs.agent-skills.sources.softaworks = {
+          path = softaworks-toolkit;
+          subdir = "skills";
+        };
       };
     };
 }

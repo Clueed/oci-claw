@@ -9,7 +9,6 @@
   llm-agents,
   authorizedKeys,
   skills-catalog,
-  softaworks-toolkit,
   ...
 }:
 let
@@ -122,7 +121,6 @@ in
   ];
 
   home-manager.useGlobalPkgs = true;
-  home-manager.extraSpecialArgs = { inherit softaworks-toolkit; };
   home-manager.users.dev = _: {
     imports = [ skills-catalog.homeManagerModules.sources ];
     programs.agent-skills.skills.enable = [
