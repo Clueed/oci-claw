@@ -80,6 +80,10 @@ in
   # fail with NOPERMISSION. The service is already connected at this point; no restart needed.
   systemd.services.tailscaled-autoconnect.restartIfChanged = false;
   systemd.services.tailscaled-autoconnect.serviceConfig.Type = lib.mkForce "simple";
+  # NotifyAccess=main: with Type=simple, $NOTIFY_SOCKET is not set by default, causing the
+  # autoconnect script's `systemd-notify --ready` to exit 1 (set -o errexit kills it before
+  # `exit 0`). Setting NotifyAccess makes systemd pass $NOTIFY_SOCKET so the notify succeeds.
+  systemd.services.tailscaled-autoconnect.serviceConfig.NotifyAccess = lib.mkForce "main";
   systemd.services.tailscaled-autoconnect.serviceConfig.Restart = "on-failure";
   systemd.services.tailscaled-autoconnect.serviceConfig.RestartSec = "10s";
 
