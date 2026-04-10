@@ -120,7 +120,7 @@ cmd_rebuild() {
   local name=${1:?'Usage: devenv rebuild <name>'}
   local devenv_dir="$PROJECTS_DIR/$name/.devenv"
   echo "Rebuilding container '$name'..."
-  nix flake update "$devenv_dir"
+  nix flake update --flake "$devenv_dir"
   sudo nixos-container update "$name"
   echo "  VS Code:  $(cmd_code "$name")"
 }
