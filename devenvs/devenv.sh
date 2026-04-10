@@ -95,7 +95,7 @@ EXTRA
   echo "  Config:  $devenv_dir/extra.nix"
   echo "  Services (accessible via Tailscale once registered):"
   echo "    OpenCode:  http://$name.<tailnet>:4096"
-  echo "    VS Code:   http://$name.<tailnet>:4000"
+  echo "    VS Code:   SSH remote to $name (auto-patched vscode-server)"
 }
 
 cmd_new() {

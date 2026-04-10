@@ -8,6 +8,8 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     opencode.url = "github:sst/opencode";
+    vscode-server.url = "github:nix-community/nixos-vscode-server";
+    vscode-server.inputs.nixpkgs.follows = "nixpkgs";
     skills-catalog.url = "path:./skills";
   };
 
@@ -18,6 +20,7 @@
       home-manager,
       sops-nix,
       opencode,
+      vscode-server,
       skills-catalog,
     }:
     let
@@ -33,6 +36,7 @@
           specialArgs = { inherit name opencode; };
           modules = [
             home-manager.nixosModules.home-manager
+            vscode-server.nixosModules.default
             ./devenvs/container.nix
           ] ++ extraModules;
         };

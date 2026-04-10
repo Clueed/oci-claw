@@ -68,16 +68,9 @@ in
   systemd.services.tailscaled-autoconnect.serviceConfig.Restart = "on-failure";
   systemd.services.tailscaled-autoconnect.serviceConfig.RestartSec = "10s";
 
-  # VS Code server accessible via Tailscale on port 4000.
-  # withoutConnectionToken: Tailscale is the auth boundary.
-  services.openvscode-server = {
-    enable = true;
-    host = "0.0.0.0";
-    port = 4000;
-    withoutConnectionToken = true;
-    user = "dev";
-    group = "users";
-  };
+  # VS Code remote server — auto-patches the VS Code server binary downloaded by the client.
+  # Runs as a user systemd service; the client connects via SSH over Tailscale.
+  services.vscode-server.enable = true;
 
   environment.systemPackages = with pkgs; [
     bash
