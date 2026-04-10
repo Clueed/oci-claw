@@ -148,12 +148,11 @@ cmd_shell() {
 
 cmd_code() {
   local name=${1:?'Usage: devenv code <name>'}
-  local tailnet
-  tailnet=$(tailscale status --json 2>/dev/null | jq -r '.MagicDNSSuffix // empty' 2>/dev/null || true)
+  # Ask the container for its own MagicDNS FQDN — handles cases where the
+  # Tailscale hostname differs from the container name (e.g. pmv-gen-2 vs pmv-gen).
   local host
-  if [ -n "$tailnet" ]; then
-    host="$name.$tailnet"
-  else
+  host=$(sudo nixos-container run "$name" -- sh -c 'tailscale status --json | jq -r ".Self.DNSName" | sed s/\\.$//' 2>/dev/null)
+  if [ -z "$host" ]; then
     host="$name"
   fi
   echo "vscode://vscode-remote/ssh-remote+dev@${host}/home/dev/${name}"
