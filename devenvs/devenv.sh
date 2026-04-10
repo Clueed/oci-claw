@@ -15,6 +15,7 @@ Commands:
   rm <name>             Destroy a dev container (project files kept)
   ls                    List dev containers
   shell <name>          Open a shell in a dev container
+  code <name>           Print VS Code SSH remote URL for the container
 EOF
 }
 
@@ -96,12 +97,11 @@ EXTRA
 
   echo ""
   echo "Container '$name' is ready."
-  echo "  Shell:   devenv shell $name"
-  echo "  Project: $project_dir"
-  echo "  Config:  $devenv_dir/extra.nix"
-  echo "  Services (accessible via Tailscale once registered):"
-  echo "    OpenCode:  http://$name.<tailnet>:4096"
-  echo "    VS Code:   SSH remote to $name (auto-patched vscode-server)"
+  echo "  Shell:    devenv shell $name"
+  echo "  Project:  $project_dir"
+  echo "  Config:   $devenv_dir/extra.nix"
+  echo "  VS Code:  $(cmd_code "$name")"
+  echo "  OpenCode: http://$name.<tailnet>:4096"
 }
 
 cmd_new() {
@@ -119,6 +119,7 @@ cmd_rebuild() {
   local name=${1:?'Usage: devenv rebuild <name>'}
   echo "Rebuilding container '$name'..."
   sudo nixos-container update "$name"
+  echo "  VS Code:  $(cmd_code "$name")"
 }
 
 cmd_rm() {
@@ -145,6 +146,19 @@ cmd_shell() {
   sudo nixos-container login "$name"
 }
 
+cmd_code() {
+  local name=${1:?'Usage: devenv code <name>'}
+  local tailnet
+  tailnet=$(tailscale status --json 2>/dev/null | jq -r '.MagicDNSSuffix // empty' 2>/dev/null || true)
+  local host
+  if [ -n "$tailnet" ]; then
+    host="$name.$tailnet"
+  else
+    host="$name"
+  fi
+  echo "vscode://vscode-remote/ssh-remote+dev@${host}/home/dev/${name}"
+}
+
 case "${1:-}" in
   new)     cmd_new "${2:-}" ;;
   clone)   cmd_clone "${2:-}" "${3:-}" ;;
@@ -152,5 +166,6 @@ case "${1:-}" in
   rm)      cmd_rm "${2:-}" ;;
   ls)      cmd_ls ;;
   shell)   cmd_shell "${2:-}" ;;
+  code)    cmd_code "${2:-}" ;;
   *)       usage; exit 1 ;;
 esac
