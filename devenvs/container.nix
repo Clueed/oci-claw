@@ -9,6 +9,7 @@
   llm-agents,
   authorizedKeys,
   skills-catalog,
+  softaworks-toolkit,
   ...
 }:
 let
