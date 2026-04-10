@@ -75,11 +75,11 @@ EXTRA
   echo "Locking flake..."
   nix flake lock "$devenv_dir"
 
-  # Unstage so we don't pollute the project's git index.
-  git -C "$project_dir" reset HEAD "$devenv_dir" 2>/dev/null || true
-
   echo "Building and creating container '$name'..."
   sudo nixos-container create "$name" --flake "$devenv_dir"
+
+  # Unstage so we don't pollute the project's git index.
+  git -C "$project_dir" reset HEAD "$devenv_dir" 2>/dev/null || true
 
   # Create /etc/secrets so nspawn can bind-mount secrets into it.
   sudo mkdir -p "/var/lib/nixos-containers/$name/etc/secrets"
