@@ -99,6 +99,7 @@ in
     curl
     jq
     agentBrowser
+    opencodePkg
     nodejs
     pnpm
     bun
