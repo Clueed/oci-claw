@@ -291,9 +291,26 @@
         "vscode-server": "vscode-server"
       }
     },
+    "shadcn-ui": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1775697198,
+        "narHash": "sha256-UVWI0P6ZVI8RcpIDjaB63ijZ4VGFvS9Elhagt9RAjAY=",
+        "owner": "shadcn-ui",
+        "repo": "ui",
+        "rev": "fc62d5781d2927242fc5ed6c1011fca7290fbde1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "shadcn-ui",
+        "repo": "ui",
+        "type": "github"
+      }
+    },
     "skills-catalog": {
       "inputs": {
         "agent-skills": "agent-skills",
+        "shadcn-ui": "shadcn-ui",
         "softaworks-toolkit": "softaworks-toolkit",
         "vercel-agent-browser": "vercel-agent-browser"
       },

@@ -11,6 +11,10 @@
       url = "github:vercel-labs/agent-browser";
       flake = false;
     };
+    shadcn-ui = {
+      url = "github:shadcn-ui/ui";
+      flake = false;
+    };
   };
 
   outputs =
@@ -19,6 +23,7 @@
       agent-skills,
       softaworks-toolkit,
       vercel-agent-browser,
+      shadcn-ui,
       ...
     }:
     {
@@ -37,6 +42,10 @@
           path = vercel-agent-browser;
           subdir = "skills";
         };
+        config.programs.agent-skills.sources.shadcn = {
+          path = shadcn-ui;
+          subdir = "skills";
+        };
       };
 
       # Full host config — sources + host skill selection.
@@ -51,6 +60,10 @@
         };
         config.programs.agent-skills.sources.vercel = {
           path = vercel-agent-browser;
+          subdir = "skills";
+        };
+        config.programs.agent-skills.sources.shadcn = {
+          path = shadcn-ui;
           subdir = "skills";
         };
       };

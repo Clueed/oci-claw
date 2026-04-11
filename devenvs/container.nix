@@ -127,6 +127,7 @@ in
       "opencode-history"
       "commit-work"
       "agent-browser"
+      "shadcn"
     ];
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
