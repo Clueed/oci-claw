@@ -15,6 +15,7 @@ Commands:
   rm <name>             Destroy a dev container (project files kept)
   ls                    List dev containers
   shell <name>          Open a shell in a dev container
+  exec [--root] <name> <cmd>  Run a command in a dev container (default: dev user)
   code <name>           Print VS Code SSH remote URL for the container
 EOF
 }
@@ -152,6 +153,25 @@ cmd_shell() {
   sudo nixos-container login "$name"
 }
 
+cmd_exec() {
+  local root=0
+  while [[ "${1:-}" == --* ]]; do
+    case "$1" in
+      --root) root=1; shift ;;
+      *) echo "error: unknown option '$1'" >&2; exit 1 ;;
+    esac
+  done
+  local name=${1:?'Usage: devenv exec [--root] <name> <cmd> [args...]'}
+  shift
+  if [[ $root -eq 1 ]]; then
+    sudo nixos-container run "$name" -- "$@"
+  else
+    local cmd
+    cmd=$(printf '%q ' "$@")
+    sudo nixos-container run "$name" -- /run/wrappers/bin/su -l dev -c "$cmd"
+  fi
+}
+
 cmd_code() {
   local name=${1:?'Usage: devenv code <name>'}
   # Ask the container for its own MagicDNS FQDN — handles cases where the
@@ -171,6 +191,7 @@ case "${1:-}" in
   rm)      cmd_rm "${2:-}" ;;
   ls)      cmd_ls ;;
   shell)   cmd_shell "${2:-}" ;;
+  exec)    cmd_exec "${@:2}" ;;
   code)    cmd_code "${2:-}" ;;
   *)       usage; exit 1 ;;
 esac
