@@ -133,6 +133,10 @@ in
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
     # credential helper uses GH_TOKEN set by gh-token.sh.
+    home.file.".config/opencode/opencode.json".text = builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      permission = "allow";
+    };
     programs.git = {
       enable = true;
       settings = {
