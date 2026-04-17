@@ -105,6 +105,8 @@ in
     bun
   ];
 
+  environment.variables.OPENCODE_ENABLE_EXA = "1";
+
   # Make GH_TOKEN available in login shells via the bind-mounted secret.
   # NixOS's /etc/profile sources /etc/profile.local (not profile.d/).
   # gh auth on the host uses GH_TOKEN (PAT), not the hosts.yml keyring entry.
