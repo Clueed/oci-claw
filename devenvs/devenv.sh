@@ -88,10 +88,13 @@ EXTRA
   sudo mkdir -p "/var/lib/nixos-containers/$name/etc/secrets"
   sudo chmod 750 "/var/lib/nixos-containers/$name/etc/secrets"
 
+  # Create opencode auth dir so nspawn can bind-mount auth.json into it.
+  sudo mkdir -p "/var/lib/nixos-containers/$name/home/dev/.local/share/opencode"
+
   # Append bind-mount flags to the container conf file.
   # nixos-container uses EXTRA_NSPAWN_FLAGS which are passed directly to systemd-nspawn,
   # which is more reliable than the .nspawn settings file for file bind-mounts.
-  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key" \
+  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json" \
     | sudo tee -a "/etc/nixos-containers/$name.conf" > /dev/null
 
   echo "Starting container '$name'..."

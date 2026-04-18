@@ -121,6 +121,7 @@ in
     "d /home/dev 0755 dev users -"
     "d /home/dev/.cache 0755 dev users -"
     "d /etc/secrets 0751 root root -"
+    "d /home/dev/.local/share/opencode 0755 dev users -"
   ];
 
   home-manager.useGlobalPkgs = true;
