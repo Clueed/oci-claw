@@ -147,7 +147,7 @@ in
       Arbitrary binaries that assume a standard FHS filesystem layout may not work without patching.
 
       To permanently add packages, edit `.devenv/extra.nix` in the project root — then ask the user
-      to run `devenv rebuild ${repo_name}` on the host system to apply the changes.
+      to run `devenv rebuild <repo-name>` on the host system to apply the changes.
     '';
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
