@@ -136,6 +136,19 @@ in
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
     # credential helper uses GH_TOKEN set by gh-token.sh.
+    home.file.".config/opencode/AGENTS.md".text = ''
+      A native browser automation CLI (`agent-browser`) is available for controlling a browser — useful for testing, QA, and web scraping.
+      It drives a real browser via an accessibility tree snapshot model: take a snapshot to get element refs, then interact with them.
+
+      See the `agent-browser` skill for usage details.
+
+      This container runs NixOS. Do not use `apt`, `brew`, or other imperative package managers.
+      Packages are managed declaratively via Nix; use `nix run nixpkgs#<pkg>` to run a package ad-hoc.
+      Arbitrary binaries that assume a standard FHS filesystem layout may not work without patching.
+
+      To permanently add packages, edit `.devenv/extra.nix` in the project root — then ask the user
+      to run `devenv rebuild ${repo_name}` on the host system to apply the changes.
+    '';
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
       permission = "allow";
