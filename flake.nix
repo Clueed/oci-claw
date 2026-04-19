@@ -7,7 +7,7 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
-    opencode.url = "github:sst/opencode";
+    opencode.url = "github:sst/opencode/ce2612020564ace2bfe95a36f139a07ba237f563";
     llm-agents.url = "github:numtide/llm-agents.nix";
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
