@@ -28,40 +28,29 @@ async function writeFavorites(favs: string[]): Promise<void> {
 async function scanDir(baseDir: string): Promise<Record<string, string[]>> {
   const groups: Record<string, string[]> = {};
 
-  async function walk(dir: string, topFolder: string) {
+  async function walk(dir: string) {
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
+    const imagesHere: string[] = [];
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        await walk(fullPath, topFolder);
+        await walk(fullPath);
       } else if (entry.isFile() && isImage(entry.name)) {
-        const relPath = path.relative(baseDir, fullPath);
-        (groups[topFolder] ??= []).push(relPath);
+        imagesHere.push(path.relative(baseDir, fullPath));
       }
     }
-  }
-
-  let topEntries;
-  try {
-    topEntries = await readdir(baseDir, { withFileTypes: true });
-  } catch {
-    return groups;
-  }
-
-  for (const entry of topEntries) {
-    if (entry.isDirectory()) {
-      await walk(path.join(baseDir, entry.name), entry.name);
-    } else if (entry.isFile() && isImage(entry.name)) {
-      (groups["(root)"] ??= []).push(entry.name);
+    if (imagesHere.length) {
+      const rel = path.relative(baseDir, dir);
+      groups[rel === "" ? "(root)" : rel] = imagesHere.sort();
     }
   }
 
-  for (const key of Object.keys(groups)) groups[key].sort();
+  await walk(baseDir);
   return groups;
 }
 
