@@ -20,6 +20,31 @@ Commands:
 EOF
 }
 
+# Build and write EXTRA_NSPAWN_FLAGS to the container conf.
+# Mode "append" adds a new line (used at creation); "replace" updates the existing line (used at rebuild).
+_write_nspawn_flags() {
+  local name=$1
+  local project_dir=$2
+  local mode=$3
+
+  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json"
+
+  local extra_flags=""
+  local flags_file="$project_dir/.devenv/nspawn-flags"
+  if [ -f "$flags_file" ]; then
+    extra_flags=$(grep -v '^\s*#' "$flags_file" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+  fi
+
+  local all_flags="$base_flags${extra_flags:+ $extra_flags}"
+  local conf="/etc/nixos-containers/$name.conf"
+
+  if [ "$mode" = "replace" ]; then
+    sudo sed -i "s|^EXTRA_NSPAWN_FLAGS=.*|EXTRA_NSPAWN_FLAGS=$all_flags|" "$conf"
+  else
+    echo "EXTRA_NSPAWN_FLAGS=$all_flags" | sudo tee -a "$conf" > /dev/null
+  fi
+}
+
 _create_container() {
   local name=$1
   local repo_url=${2:-}
@@ -72,6 +97,13 @@ FLAKE
 }
 EXTRA
 
+  # Generate .devenv/nspawn-flags template
+  cat > "$devenv_dir/nspawn-flags" <<'FLAGS'
+# Extra systemd-nspawn flags for this container (one per line, comments ignored).
+# Run `devenv rebuild <name>` after making changes.
+# Example: --bind=/mnt/stash-data:/mnt/stash-data
+FLAGS
+
   # Stage .devenv files so Nix can evaluate them (it refuses untracked files in git repos).
   git -C "$project_dir" add "$devenv_dir"
 
@@ -91,11 +123,8 @@ EXTRA
   # Create opencode auth dir so nspawn can bind-mount auth.json into it.
   sudo mkdir -p "/var/lib/nixos-containers/$name/home/dev/.local/share/opencode"
 
-  # Append bind-mount flags to the container conf file.
-  # nixos-container uses EXTRA_NSPAWN_FLAGS which are passed directly to systemd-nspawn,
-  # which is more reliable than the .nspawn settings file for file bind-mounts.
-  echo "EXTRA_NSPAWN_FLAGS=--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json" \
-    | sudo tee -a "/etc/nixos-containers/$name.conf" > /dev/null
+  # Write EXTRA_NSPAWN_FLAGS (base flags + any declared in .devenv/nspawn-flags).
+  _write_nspawn_flags "$name" "$project_dir" append
 
   echo "Starting container '$name'..."
   sudo nixos-container start "$name"
@@ -129,6 +158,7 @@ cmd_rebuild() {
   nix flake update --flake "$devenv_dir"
   sudo nixos-container update "$name"
   git -C "$project_dir" reset HEAD .devenv 2>/dev/null || true
+  _write_nspawn_flags "$name" "$project_dir" replace
   echo "  VS Code:  $(cmd_code "$name")"
 }
 
