@@ -6,5 +6,6 @@
     "commit-work"
     "devenv"
     "skill-creator"
+    "download-video"
   ];
 }
