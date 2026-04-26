@@ -6,16 +6,32 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1774607140,
-        "narHash": "sha256-0P89BLGEzRUumWKSOEayi+Dal6mIlVumlBgcyk5Qo6s=",
+        "lastModified": 1776741567,
+        "narHash": "sha256-TbTToAtfQBhMr85xQOQ1ZJggnt6bt8eU1RW6zxHT1rQ=",
         "owner": "Kyure-A",
         "repo": "agent-skills-nix",
-        "rev": "e29bef0e9e56c4cc683cead15a6eda1d6fb1074e",
+        "rev": "bb2ababb31f83be94eefe76009602c926025cafb",
         "type": "github"
       },
       "original": {
         "owner": "Kyure-A",
         "repo": "agent-skills-nix",
+        "type": "github"
+      }
+    },
+    "anthropics-skills": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1776964038,
+        "narHash": "sha256-xFsg66TCtKzSgRIW6Ab771FWEIhei3jPgfE4byMiB44=",
+        "owner": "anthropics",
+        "repo": "skills",
+        "rev": "5128e1865d670f5d6c9cef000e6dfc4e951fb5b9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "anthropics",
+        "repo": "skills",
         "type": "github"
       }
     },
@@ -148,11 +164,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1773608492,
-        "narHash": "sha256-QZteyExJYSQzgxqdsesDPbQgjctGG7iKV/6ooyQPITk=",
+        "lastModified": 1776657094,
+        "narHash": "sha256-tqTMK+nr4kXUrErteg/1hrQ816Ss7+2RsPNYZiVpf0I=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "9a40ec3b78fc688d0908485887d355caa5666d18",
+        "rev": "29f355a7338f30f32142f4ff44e805d47d0086b1",
         "type": "github"
       },
       "original": {
@@ -249,11 +265,11 @@
     },
     "nixpkgs_4": {
       "locked": {
-        "lastModified": 1773520392,
-        "narHash": "sha256-Ra3l8zI7AYwaCxXcU4An8jAC1hhz/TEleXboJhWaBwY=",
+        "lastModified": 1776169885,
+        "narHash": "sha256-l/iNYDZ4bGOAFQY2q8y5OAfBBtrDAaPuRQqWaFHVRXM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f59e980846fe86cd831899cd032fdbd1d6054086",
+        "rev": "4bd9165a9165d7b5e33ae57f3eecbcb28fb231c9",
         "type": "github"
       },
       "original": {
@@ -296,11 +312,11 @@
     "shadcn-ui": {
       "flake": false,
       "locked": {
-        "lastModified": 1775697198,
-        "narHash": "sha256-UVWI0P6ZVI8RcpIDjaB63ijZ4VGFvS9Elhagt9RAjAY=",
+        "lastModified": 1777113596,
+        "narHash": "sha256-OWdP2lFXjI3RNNZujZTp7WblDvZU69u56loIxIYvCE0=",
         "owner": "shadcn-ui",
         "repo": "ui",
-        "rev": "fc62d5781d2927242fc5ed6c1011fca7290fbde1",
+        "rev": "0126502236750ce2d68b99517f14c6a307843a76",
         "type": "github"
       },
       "original": {
@@ -312,6 +328,7 @@
     "skills-catalog": {
       "inputs": {
         "agent-skills": "agent-skills",
+        "anthropics-skills": "anthropics-skills",
         "shadcn-ui": "shadcn-ui",
         "softaworks-toolkit": "softaworks-toolkit",
         "vercel-agent-browser": "vercel-agent-browser"
@@ -416,11 +433,11 @@
     "vercel-agent-browser": {
       "flake": false,
       "locked": {
-        "lastModified": 1775718452,
-        "narHash": "sha256-U0GMX91tAedqf1M0EBKEFgCFObB3acosmYGY2XtkvHU=",
+        "lastModified": 1776719567,
+        "narHash": "sha256-DmlTsY0qYDmJrVUNLLe+FTkstmTdnmLAeXa0lu7fkto=",
         "owner": "vercel-labs",
         "repo": "agent-browser",
-        "rev": "fa043a496f7579680c78b22d0a5015f48dc99a4d",
+        "rev": "57405f93614fae46e5c955ce662b4785283e1301",
         "type": "github"
       },
       "original": {

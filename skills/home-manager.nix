@@ -5,5 +5,6 @@
     "opencode-history"
     "commit-work"
     "devenv"
+    "skill-creator"
   ];
 }

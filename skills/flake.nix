@@ -15,6 +15,10 @@
       url = "github:shadcn-ui/ui";
       flake = false;
     };
+    anthropics-skills = {
+      url = "github:anthropics/skills";
+      flake = false;
+    };
   };
 
   outputs =
@@ -24,6 +28,7 @@
       softaworks-toolkit,
       vercel-agent-browser,
       shadcn-ui,
+      anthropics-skills,
       ...
     }:
     {
@@ -46,6 +51,10 @@
           path = shadcn-ui;
           subdir = "skills";
         };
+        config.programs.agent-skills.sources.anthropics = {
+          path = anthropics-skills;
+          subdir = "skills";
+        };
       };
 
       # Full host config — sources + host skill selection.
@@ -64,6 +73,10 @@
         };
         config.programs.agent-skills.sources.shadcn = {
           path = shadcn-ui;
+          subdir = "skills";
+        };
+        config.programs.agent-skills.sources.anthropics = {
+          path = anthropics-skills;
           subdir = "skills";
         };
       };
