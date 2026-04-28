@@ -32,7 +32,7 @@ _write_nspawn_flags() {
   local extra_flags=""
   local flags_file="$project_dir/.devenv/nspawn-flags"
   if [ -f "$flags_file" ]; then
-    extra_flags=$(grep -v '^\s*#' "$flags_file" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+    extra_flags=$(sed '/^[[:space:]]*#/d' "$flags_file" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
   fi
 
   local all_flags="$base_flags${extra_flags:+ $extra_flags}"
