@@ -6,6 +6,7 @@
   lib,
   name,
   opencode,
+  claude-code-nix,
   llm-agents,
   authorizedKeys,
   skills-catalog,
@@ -13,6 +14,10 @@
 }:
 let
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  claudeCodePkg = claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  claudeWrapper = pkgs.writeShellScriptBin "claude" ''
+    exec ${claudeCodePkg}/bin/claude --dangerously-skip-permissions "$@"
+  '';
   agentBrowser = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.agent-browser;
 in
 {
@@ -100,6 +105,7 @@ in
     jq
     agentBrowser
     opencodePkg
+    claudeWrapper
     nodejs
     pnpm
     bun

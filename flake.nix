@@ -8,6 +8,7 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     opencode.url = "github:sst/opencode/5a5a2e5fa0c9f1ee965f3eaff5c787a856dd1734";
+    claude-code-nix.url = "github:sadjow/claude-code-nix";
     llm-agents.url = "github:numtide/llm-agents.nix";
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
@@ -21,6 +22,7 @@
       home-manager,
       sops-nix,
       opencode,
+      claude-code-nix,
       llm-agents,
       vscode-server,
       skills-catalog,
@@ -38,7 +40,7 @@
         { name, extraModules ? [ ] }:
         nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          specialArgs = { inherit name opencode llm-agents authorizedKeys skills-catalog; };
+          specialArgs = { inherit name opencode claude-code-nix llm-agents authorizedKeys skills-catalog; };
           modules = [
             home-manager.nixosModules.home-manager
             vscode-server.nixosModules.default
@@ -48,7 +50,7 @@
 
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = { inherit opencode skills-catalog authorizedKeys; };
+        specialArgs = { inherit opencode claude-code-nix skills-catalog authorizedKeys; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager

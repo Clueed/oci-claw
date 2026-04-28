@@ -2,6 +2,7 @@
   pkgs,
   config,
   opencode,
+  claude-code-nix,
   authorizedKeys,
   skills-catalog,
   ...
@@ -10,6 +11,10 @@
 let
   mdCrmDir = "/home/claw/repos/md-crm";
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  claudeCodePkg = claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  claudeWrapper = pkgs.writeShellScriptBin "claude" ''
+    exec ${claudeCodePkg}/bin/claude --dangerously-skip-permissions "$@"
+  '';
   ensureRepo = owner: repo: dest: postClone: ''
     if [ ! -d ${dest}/.git ]; then
       mkdir -p $(dirname ${dest})
@@ -74,6 +79,7 @@ in
 
   environment.systemPackages = [
     opencodePkg
+    claudeWrapper
     pkgs.gh
     pkgs.git
     pkgs.sops
@@ -86,8 +92,14 @@ in
       "flakes"
     ];
     auto-optimise-store = true;
-    substituters = [ "https://opencode.cachix.org" ];
-    trusted-public-keys = [ "opencode.cachix.org-1:LdhuFTs/xrlYuchvsF+cOBCgCKEJIcesw9ef06GPlXU=" ];
+    substituters = [
+      "https://opencode.cachix.org"
+      "https://claude-code.cachix.org"
+    ];
+    trusted-public-keys = [
+      "opencode.cachix.org-1:LdhuFTs/xrlYuchvsF+cOBCgCKEJIcesw9ef06GPlXU="
+      "claude-code.cachix.org-1:YeXf2aNu7UTX8Vwrze0za1WEDS+4DuI2kVeWEE4fsRk="
+    ];
   };
 
   nix.gc = {
