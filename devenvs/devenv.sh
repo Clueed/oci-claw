@@ -210,7 +210,7 @@ cmd_code() {
   # Ask the container for its own MagicDNS FQDN — handles cases where the
   # Tailscale hostname differs from the container name (e.g. pmv-gen-2 vs pmv-gen).
   local host
-  host=$(sudo nixos-container run "$name" -- sh -c 'tailscale status --json | jq -r ".Self.DNSName" | sed s/\\.$//' 2>/dev/null)
+  host=$(sudo nixos-container run "$name" -- sh -c 'tailscale status --json | jq -r ".Self.DNSName" | sed s/\\.$//' 2>/dev/null) || true
   if [ -z "$host" ]; then
     host="$name"
   fi
