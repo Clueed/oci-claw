@@ -122,11 +122,16 @@ in
 
   # Required for home-manager to work in nixos-container.
   # /etc/secrets is created here so nspawn can bind-mount secrets into it at container start.
+  # Intermediate .local and .local/share must be declared so tmpfiles creates them
+  # as dev-owned. Otherwise it auto-creates them as root:root while processing the
+  # opencode rule, then refuses to fix the leaf with "unsafe path transition".
   systemd.tmpfiles.rules = [
     "d /nix/var/nix/profiles/per-user/dev 0755 dev users -"
     "d /home/dev 0755 dev users -"
     "d /home/dev/.cache 0755 dev users -"
     "d /etc/secrets 0751 root root -"
+    "d /home/dev/.local 0755 dev users -"
+    "d /home/dev/.local/share 0755 dev users -"
     "d /home/dev/.local/share/opencode 0755 dev users -"
   ];
 
