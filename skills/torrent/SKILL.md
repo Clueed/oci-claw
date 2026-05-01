@@ -55,7 +55,7 @@ transmission-remote -t <id> --reannounce
 ## Workflow Example (file deselection)
 
 1. List torrents: `transmission-remote -l`
-2. Identify most recent torrent (last line, lowest ID that is stopped/new)
+2. Identify most recent torrent (highest ID)
 3. List files: `transmission-remote -t <id> -f`
 4. Unselect all: `transmission-remote -t <id> -G <first>-<last>`
 5. Select specific file: `transmission-remote -t <id> -g <index>`
