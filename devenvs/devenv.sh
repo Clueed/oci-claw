@@ -11,7 +11,7 @@ Usage: devenv <command> [args]
 Commands:
   new <name>            Create a new empty dev container
   clone <url> [name]    Clone a GitHub repo into a dev container
-  rebuild <name>        Rebuild container after editing .devenv/extra.nix
+  rebuild [--restart] <name>  Rebuild container after editing .devenv/extra.nix
   rm <name>             Destroy a dev container (project files kept)
   ls                    List dev containers
   shell <name>          Open a shell in a dev container
@@ -153,7 +153,14 @@ cmd_clone() {
 }
 
 cmd_rebuild() {
-  local name=${1:?'Usage: devenv rebuild <name>'}
+  local restart=0
+  while [[ "${1:-}" == --* ]]; do
+    case "$1" in
+      --restart) restart=1; shift ;;
+      *) echo "error: unknown option '$1'" >&2; exit 1 ;;
+    esac
+  done
+  local name=${1:?'Usage: devenv rebuild [--restart] <name>'}
   local project_dir="$PROJECTS_DIR/$name"
   local devenv_dir="$project_dir/.devenv"
   echo "Rebuilding container '$name'..."
@@ -162,6 +169,13 @@ cmd_rebuild() {
   sudo nixos-container update "$name"
   git -C "$project_dir" reset HEAD .devenv 2>/dev/null || true
   _write_nspawn_flags "$name" "$project_dir" replace
+  if [[ $restart -eq 1 ]]; then
+    echo "Restarting container '$name'..."
+    sudo nixos-container stop "$name"
+    sudo nixos-container start "$name"
+  else
+    echo "  Note: bind-mount changes require a full restart: devenv rebuild --restart $name"
+  fi
   echo "  VS Code:  $(cmd_code "$name")"
 }
 
