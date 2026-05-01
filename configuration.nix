@@ -84,6 +84,7 @@ in
     pkgs.git
     pkgs.sops
     pkgs.nixos-container
+    pkgs.mosh
   ];
 
   nix.settings = {
@@ -125,6 +126,9 @@ in
     51413
   ];
   networking.firewall.allowedUDPPorts = [ 51413 ];
+  networking.firewall.allowedUDPPortRanges = [
+    { from = 60000; to = 61000; }
+  ];
   services.openssh = {
     enable = true;
     settings = {
