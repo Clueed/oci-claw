@@ -27,7 +27,7 @@ _write_nspawn_flags() {
   local project_dir=$2
   local mode=$3
 
-  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json --bind-ro=/home/claw/.claude/.credentials.json:/home/dev/.claude/.credentials.json"
+  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json --bind=/home/claw/.claude/.credentials.json:/home/dev/.claude/.credentials.json"
 
   local extra_flags=""
   local flags_file="$project_dir/.devenv/nspawn-flags"
@@ -237,7 +237,7 @@ cmd_code() {
 case "${1:-}" in
   new)     cmd_new "${2:-}" ;;
   clone)   cmd_clone "${2:-}" "${3:-}" ;;
-  rebuild) cmd_rebuild "${2:-}" ;;
+  rebuild) cmd_rebuild "${@:2}" ;;
   rm)      cmd_rm "${2:-}" ;;
   ls)      cmd_ls ;;
   shell)   cmd_shell "${2:-}" ;;
