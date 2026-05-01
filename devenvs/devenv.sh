@@ -174,7 +174,7 @@ cmd_rebuild() {
     sudo nixos-container stop "$name"
     sudo nixos-container start "$name"
   else
-    echo "  Note: bind-mount changes require a full restart: devenv rebuild --restart $name"
+    echo "  Note: some changes, like new bind-mounts, require a full restart: devenv rebuild --restart $name"
   fi
   echo "  VS Code:  $(cmd_code "$name")"
 }
