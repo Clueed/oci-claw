@@ -7,6 +7,11 @@ description: Interact with the Stash API (stashbox/Gamma) for managing scenes, p
 
 Stash API runs at `http://localhost:9999/graphql`.
 
+## Tag References
+
+For tag operations (find, create, update, hierarchy, aliases, orphan cleanup, merge), see [tags.md](./tags.md).
+For full GraphQL schema details (filter types, mutation inputs, sort options), see [tags-details.md](./tags-details.md).
+
 ## Authentication
 
 Set `STASH_API_KEY` environment variable (from `/run/secrets/stash_api_key`).
@@ -53,13 +58,6 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
   -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findStudios(filter: { q: \"NAME\" }) { studios { id name url } } }"}'
-```
-
-### Find Tags
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ findTags(filter: { q: \"NAME\" }) { tags { id name } } }"}'
 ```
 
 ## When to use me
