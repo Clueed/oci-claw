@@ -27,7 +27,7 @@ _write_nspawn_flags() {
   local project_dir=$2
   local mode=$3
 
-  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json"
+  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json --bind-ro=/home/claw/.claude/.credentials.json:/home/dev/.claude/.credentials.json"
 
   local extra_flags=""
   local flags_file="$project_dir/.devenv/nspawn-flags"
@@ -122,6 +122,9 @@ FLAGS
 
   # Create opencode auth dir so nspawn can bind-mount auth.json into it.
   sudo mkdir -p "/var/lib/nixos-containers/$name/home/dev/.local/share/opencode"
+
+  # Create claude auth dir so nspawn can bind-mount .credentials.json into it.
+  sudo mkdir -p "/var/lib/nixos-containers/$name/home/dev/.claude"
 
   # Write EXTRA_NSPAWN_FLAGS (base flags + any declared in .devenv/nspawn-flags).
   _write_nspawn_flags "$name" "$project_dir" append

@@ -133,6 +133,7 @@ in
     "d /home/dev/.local 0755 dev users -"
     "d /home/dev/.local/share 0755 dev users -"
     "d /home/dev/.local/share/opencode 0755 dev users -"
+    "d /home/dev/.claude 0755 dev users -"
   ];
 
   home-manager.useGlobalPkgs = true;
