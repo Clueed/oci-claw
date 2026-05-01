@@ -39,9 +39,11 @@ in
   sops.secrets.tailscale_auth_key = { };
   sops.secrets.tailscale_devenv_auth_key = { };
 
-  system.activationScripts.ensure-nixos-repo   = ensureRepo "Clueed" "oci-claw"    "/home/claw/nixos"    "";
-  system.activationScripts.ensure-nanoclaw-repo = ensureRepo "Clueed" "nanoclaw"    "/home/claw/nanoclaw" "";
-  system.activationScripts.ensure-md-crm-repo   = ensureRepo "Clueed" "md-crm.git" mdCrmDir ''
+  system.activationScripts.ensure-nixos-repo = ensureRepo "Clueed" "oci-claw" "/home/claw/nixos" "";
+  system.activationScripts.ensure-nanoclaw-repo =
+    ensureRepo "Clueed" "nanoclaw" "/home/claw/nanoclaw"
+      "";
+  system.activationScripts.ensure-md-crm-repo = ensureRepo "Clueed" "md-crm.git" mdCrmDir ''
     # Podman rootless: container node user needs world-writable dirs to create/edit vault files.
     chmod 777 ${mdCrmDir} ${mdCrmDir}/People
   '';
@@ -127,7 +129,10 @@ in
   ];
   networking.firewall.allowedUDPPorts = [ 51413 ];
   networking.firewall.allowedUDPPortRanges = [
-    { from = 60000; to = 61000; }
+    {
+      from = 60000;
+      to = 61000;
+    }
   ];
   services.openssh = {
     enable = true;
@@ -220,6 +225,7 @@ in
         - You manage NixOS configuration in /home/claw/nixos .
         - You ONLY make changes by editing /home/claw/nixos/
         - You NEVER use imperative commands to change system state.
+        - You can run any tool available in nixpkgs via `nix run nixpkgs#<package> -- <args>`. For example, `nix run nixpkgs#jq -- --help` to run jq with arguments.
       '';
 
       home.file."CLAUDE.md".text = "@AGENTS.md";

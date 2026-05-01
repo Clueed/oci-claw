@@ -25,7 +25,7 @@ cd /mnt/stash-data/remote/ && nix run nixpkgs#yt-dlp -- -f "bestvideo[ext=mp4]+b
 
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -d '{"query":"mutation { metadataScan(input: {paths: [\"/data/remote\"]}) }"}'
+  -d '{"query":"mutation { metadataScan(input: {paths: [\"/data/remote\"], scanGenerateCovers: true, scanGeneratePreviews: true, scanGenerateSprites: true, scanGeneratePhashes: true, scanGenerateThumbnails: true}) }"}'
 ```
 
 ### Step 3: Find the New Scene
