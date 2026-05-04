@@ -103,6 +103,7 @@ in
     gh
     curl
     jq
+    mosh
     agentBrowser
     opencodePkg
     claudeWrapper
