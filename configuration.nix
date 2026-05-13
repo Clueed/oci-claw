@@ -53,7 +53,11 @@ in
   services.tailscale = {
     enable = true;
     authKeyFile = config.sops.secrets.tailscale_auth_key.path;
-    extraUpFlags = [ "--advertise-tags=tag:claw" ];
+    useRoutingFeatures = "server";
+    extraUpFlags = [
+      "--advertise-tags=tag:claw"
+      "--advertise-exit-node"
+    ];
   };
 
   systemd.services.tailscale-serve = {
