@@ -90,6 +90,7 @@ in
     pkgs.sops
     pkgs.nixos-container
     pkgs.mosh
+    pkgs.screen
   ];
 
   nix.settings = {
