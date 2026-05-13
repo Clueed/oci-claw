@@ -27,8 +27,9 @@ Tags without any scenes, markers, images, galleries, performers, or studios are 
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
   -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ findTags(filter: { q: \"NAME\" }) { tags { id name } } }"}'
+  -d '{"query":"{ findTags(filter: {}, tag_filter: {}) { tags { id name } } }"}'
 ```
+Note: `findTags` does not support pagination (`page`/`page_size`). Use `filter: { q: "NAME" }` for searching, or fetch all tags at once (API returns up to the server's default limit).
 
 ### Find Tags with Aliases
 ```bash
@@ -65,8 +66,7 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 for term in "lesbian girls" "Japanese actress" "bbw"; do
   curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
     -H "ApiKey: $STASH_API_KEY" \
-    -d "{\"query\":\"{ findTags(filter: { q: \\\"$term\\\" }, tag_filter: {}) { tags { name aliases } } }\"}" \
-    | jq -r '.data.findTags.tags[0] // empty | "\($term) → \(.name) (aliases: \(.aliases | join(", ")))"'
+    -d "{\"query\":\"{ findTags(filter: { q: \\\"$term\\\" }, tag_filter: {}) { tags { name aliases } } }\"}"
 done
 ```
 
