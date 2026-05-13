@@ -205,6 +205,10 @@ in
       programs.bash.initExtra = ''
         export GH_TOKEN=$(cat /run/secrets/github_pat 2>/dev/null || true)
 
+        if [[ -z "$STY" ]]; then
+          exec screen -RD
+        fi
+
         opencode() {
           if [ $# -eq 0 ]; then
             command opencode attach http://localhost:4096
