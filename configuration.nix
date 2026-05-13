@@ -3,6 +3,7 @@
   config,
   opencode,
   claude-code-nix,
+  llm-agents,
   authorizedKeys,
   skills-catalog,
   ...
@@ -12,6 +13,7 @@ let
   mdCrmDir = "/home/claw/repos/md-crm";
   opencodePkg = opencode.packages.${pkgs.stdenv.hostPlatform.system}.default;
   claudeCodePkg = claude-code-nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  agentBrowserPkg = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.agent-browser;
   claudeWrapper = pkgs.writeShellScriptBin "claude" ''
     exec ${claudeCodePkg}/bin/claude --dangerously-skip-permissions "$@"
   '';
@@ -82,6 +84,7 @@ in
   environment.systemPackages = [
     opencodePkg
     claudeWrapper
+    agentBrowserPkg
     pkgs.gh
     pkgs.git
     pkgs.sops

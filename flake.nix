@@ -50,7 +50,7 @@
 
       nixosConfigurations."ociclaw-1" = nixpkgs.lib.nixosSystem {
         system = "aarch64-linux";
-        specialArgs = { inherit opencode claude-code-nix skills-catalog authorizedKeys; };
+        specialArgs = { inherit opencode claude-code-nix llm-agents skills-catalog authorizedKeys; };
         modules = [
           ./configuration.nix
           home-manager.nixosModules.home-manager

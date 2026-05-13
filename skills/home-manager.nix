@@ -7,5 +7,6 @@
     "devenv"
     "skill-creator"
     "download-video"
+    "agent-browser"
   ];
 }
