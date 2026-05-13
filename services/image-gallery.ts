@@ -62,7 +62,12 @@ const GALLERY_HTML = /* html */ `<!DOCTYPE html>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #111; color: #ddd; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
-#sidebar { width: 220px; min-width: 220px; overflow-y: auto; border-right: 1px solid #2a2a2a; padding: 8px; }
+#sidebar { width: 240px; min-width: 240px; border-right: 1px solid #2a2a2a; display: flex; flex-direction: column; overflow: hidden; }
+#search { background: #161616; border: none; border-bottom: 1px solid #2a2a2a; color: #ccc; font-size: 12px; padding: 7px 10px; outline: none; width: 100%; flex-shrink: 0; }
+#search:focus { background: #1a1a1a; }
+#search::placeholder { color: #3a3a3a; }
+#folder-section { overflow-y: auto; flex: 1 1 0; min-height: 80px; padding: 8px; border-bottom: 1px solid #1e1e1e; }
+#file-section { overflow-y: auto; flex: 2 1 0; min-height: 80px; padding: 8px; }
 #sidebar h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #555; margin-bottom: 8px; padding: 2px 6px; }
 .folder { padding: 5px 8px; cursor: pointer; border-radius: 4px; font-size: 13px; margin-bottom: 1px; display: flex; justify-content: space-between; align-items: center; }
 .folder:hover { background: #1e1e1e; }
@@ -70,6 +75,11 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 .folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-count { color: #555; font-size: 11px; margin-left: 6px; flex-shrink: 0; }
 .folder.active .folder-count { color: #aaa; }
+.file-entry { padding: 4px 8px; cursor: pointer; border-radius: 3px; font-size: 12px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #888; }
+.file-entry:hover { background: #1e1e1e; color: #ddd; }
+.file-entry.active { background: #1a3a6a; color: #fff; }
+.file-entry.search-match { color: #6af; }
+.file-entry.active.search-match { color: #9cf; }
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 #toolbar { padding: 6px 12px; border-bottom: 1px solid #1e1e1e; font-size: 12px; color: #666; display: flex; align-items: center; gap: 8px; min-height: 32px; }
 #img-name { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -93,8 +103,15 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 </head>
 <body>
 <div id="sidebar">
-  <h2>Folders</h2>
-  <div id="folder-list"></div>
+  <input id="search" type="text" placeholder="Search files… (/)" autocomplete="off" spellcheck="false">
+  <div id="folder-section">
+    <h2>Folders</h2>
+    <div id="folder-list"></div>
+  </div>
+  <div id="file-section">
+    <h2>Files</h2>
+    <div id="file-list"></div>
+  </div>
 </div>
 <div id="main">
   <div id="toolbar">
@@ -113,6 +130,8 @@ let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new S
 const img = document.getElementById('current-img');
 const empty = document.getElementById('empty');
 const folderList = document.getElementById('folder-list');
+const fileList = document.getElementById('file-list');
+const searchInput = document.getElementById('search');
 const imgName = document.getElementById('img-name');
 const imgCounter = document.getElementById('img-counter');
 const viewer = document.getElementById('viewer');
@@ -157,6 +176,7 @@ async function load() {
     if (data[f] && i >= 0 && i < data[f].length) {
       folder = f; idx = i;
       document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === f));
+      renderFileList();
       show();
       return;
     }
@@ -167,19 +187,45 @@ async function load() {
 function pick(f) {
   folder = f; idx = 0; viewingFavs = false;
   setZoom(1);
+  searchInput.value = '';
   document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === f));
+  renderFileList();
   show();
 }
 
 function pickFavs(startIdx) {
   viewingFavs = true; folder = '★ Favorites'; idx = startIdx ?? 0;
   setZoom(1);
+  searchInput.value = '';
   document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === '★ Favorites'));
+  renderFileList();
   show();
 }
 
 function getFavImgs() {
   return Object.values(data).flat().filter(p => favorites.has(p)).sort();
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  const imgs = viewingFavs ? getFavImgs() : (data[folder] ?? []);
+  for (let i = 0; i < imgs.length; i++) {
+    const name = imgs[i].split('/').pop();
+    const el = document.createElement('div');
+    el.className = 'file-entry';
+    el.dataset.i = String(i);
+    el.textContent = name;
+    el.title = imgs[i];
+    el.onclick = () => { idx = parseInt(el.dataset.i); setZoom(1); show(); };
+    fileList.appendChild(el);
+  }
+}
+
+function updateFileActive() {
+  const entries = fileList.querySelectorAll('.file-entry');
+  entries.forEach((el, i) => el.classList.toggle('active', i === idx));
+  const activeEl = fileList.querySelector('.file-entry.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
 }
 
 async function toggleFavorite() {
@@ -191,7 +237,10 @@ async function toggleFavorite() {
     body: JSON.stringify({ path }),
   });
   favorites = new Set(await res.json());
-  if (viewingFavs) { if (idx >= getFavImgs().length) idx = Math.max(0, idx - 1); }
+  if (viewingFavs) {
+    if (idx >= getFavImgs().length) idx = Math.max(0, idx - 1);
+    renderFileList();
+  }
   show();
   renderSidebarFavs();
 }
@@ -231,6 +280,7 @@ function show() {
   favBtn.classList.toggle('active', favorites.has(imgs[idx]));
   history.replaceState(null, '', '#' + encodeURIComponent(folder) + '/' + idx);
   preload(imgs, idx + 1, 3);
+  updateFileActive();
 }
 
 function setZoom(z) {
@@ -250,11 +300,60 @@ function toggleMode() {
   }
 }
 
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase();
+  const entries = Array.from(fileList.querySelectorAll('.file-entry'));
+  if (!q) {
+    entries.forEach(el => el.classList.remove('search-match'));
+    return;
+  }
+  const imgs = viewingFavs ? getFavImgs() : (data[folder] ?? []);
+  let firstMatch = -1;
+  entries.forEach((el, i) => {
+    const name = imgs[i].split('/').pop().toLowerCase();
+    const matches = name.includes(q);
+    el.classList.toggle('search-match', matches);
+    if (matches && firstMatch === -1) firstMatch = i;
+  });
+  if (firstMatch !== -1) {
+    idx = firstMatch;
+    show();
+  }
+});
+
+function getMatchIndices() {
+  const indices = [];
+  fileList.querySelectorAll('.file-entry').forEach((el, i) => { if (el.classList.contains('search-match')) indices.push(i); });
+  return indices;
+}
+
 document.addEventListener('keydown', e => {
+  if (e.target === searchInput) {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchInput.blur();
+      fileList.querySelectorAll('.file-entry').forEach(el => el.classList.remove('search-match'));
+    }
+    return;
+  }
+  if (e.key === '/') { e.preventDefault(); searchInput.focus(); return; }
   if (!folder) return;
   const imgs = viewingFavs ? getFavImgs() : (data[folder] ?? []), fi = folders.indexOf(folder);
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { if (idx < imgs.length - 1) { idx++; show(); } }
-  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { if (idx > 0) { idx--; show(); } }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    const matches = getMatchIndices();
+    if (matches.length) {
+      const pos = matches.indexOf(idx);
+      const next = matches[pos < matches.length - 1 ? pos + 1 : pos];
+      if (next !== idx) { idx = next; show(); }
+    } else if (idx < imgs.length - 1) { idx++; show(); }
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    const matches = getMatchIndices();
+    if (matches.length) {
+      const pos = matches.indexOf(idx);
+      const prev = matches[pos > 0 ? pos - 1 : 0];
+      if (prev !== idx) { idx = prev; show(); }
+    } else if (idx > 0) { idx--; show(); }
+  }
   else if (e.key === ']') { if (fi < folders.length - 1) pick(folders[fi + 1]); }
   else if (e.key === '[') { if (fi > 0) pick(folders[fi - 1]); }
   else if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
