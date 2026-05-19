@@ -25,6 +25,7 @@ in
 
   networking.hostName = name;
   networking.useDHCP = false;
+  networking.firewall.allowedTCPPorts = [ 4096 ];
 
   users.users.dev = {
     isNormalUser = true;
