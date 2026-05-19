@@ -13,6 +13,8 @@ This skill downloads videos from URLs using yt-dlp, adds them to the stash video
 - Stash API is running on localhost:9999
 - The video library path in stash is `/data/remote` (mounted at `/mnt/stash-data/remote/` on the host)
 
+> `<skill-path>` below refers to this skill's absolute directory path (where this SKILL.md lives).
+
 ## Workflow
 
 ### Option A: yt-dlp (default)
@@ -74,12 +76,12 @@ EOF
 
 ### Option B: gofile.io
 
-For gofile.io links, the script is bundled at `./gofile-downloader.ts` in this directory. No scraping or URL tagging is needed.
+For gofile.io links, the script is bundled at `scripts/gofile-downloader.ts`. No scraping or URL tagging is needed.
 
 #### Step 1: Download
 
 ```bash
-cd /mnt/stash-data/remote/ && bun ./gofile-downloader.ts "GOFILE_URL"
+cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/gofile-downloader.ts "GOFILE_URL"
 ```
 
 #### Step 2: Trigger Metadata Scan
