@@ -32,50 +32,54 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 
 #### Step 3: Find the New Scene
 
+The scan is asynchronous — the scene may take a moment to appear. You may need to wait a few seconds and retry.
+
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
   -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title urls } } }"}'
 ```
 
-#### Step 4: Scrape Metadata from URL
+#### Steps 4-6: Scrape Metadata & Update Scene (combined)
+
+Scrapes title/details/image from the URL and updates the scene in one shot using Python to safely build the JSON.
 
 ```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -d '{"query":"{ scrapeSceneURL(url: \"VIDEO_URL\") { title details date image studio { name } performers { name } tags { name } } }"}'
-```
-
-#### Step 5: Update the Scene
-
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -d '{"query":"mutation { sceneUpdate(input: {id: \"SCENE_ID\", title: \"TITLE\", details: \"DETAILS\", urls: [\"VIDEO_URL\"]}) { id } }"}'
-```
-
-#### Step 6: Set Cover Image
-
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -d '{"query":"{ scrapeSceneURL(url: \"VIDEO_URL\") { image } }"}' > /tmp/scrape_result.json
 nix run nixpkgs#python3 << 'EOF'
-import json
-with open('/tmp/scrape_result.json') as f:
-    data = json.load(f)
-image = data['data']['scrapeSceneURL']['image']
-mutation = {"query": f'mutation {{ sceneUpdate(input: {{id: "SCENE_ID", cover_image: "{image}"}}) {{ id }} }}'}
-with open('/tmp/mutation.json', 'w') as f:
-    json.dump(mutation, f)
+import json, urllib.request
+
+VIDEO_URL = "VIDEO_URL"
+SCENE_ID = "SCENE_ID"
+
+# Scrape metadata
+query = {"query": '{ scrapeSceneURL(url: "' + VIDEO_URL + '") { title details image } }'}
+req = urllib.request.Request("http://localhost:9999/graphql", data=json.dumps(query).encode(), headers={"Content-Type": "application/json"})
+resp = json.loads(urllib.request.urlopen(req).read().decode())
+scraped = resp["data"]["scrapeSceneURL"]
+
+# Build update mutation with proper JSON escaping
+update = {
+    "query": "mutation { sceneUpdate(input: {id: \"" + SCENE_ID + "\", title: $title, details: $details, urls: [\"" + VIDEO_URL + "\"], cover_image: $image}) { id } }",
+    "variables": {
+        "title": scraped["title"],
+        "details": scraped["details"],
+        "image": scraped["image"]
+    }
+}
+
+req2 = urllib.request.Request("http://localhost:9999/graphql", data=json.dumps(update).encode(), headers={"Content-Type": "application/json"})
+result = json.loads(urllib.request.urlopen(req2).read().decode())
+print(json.dumps(result, indent=2))
 EOF
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" -d @/tmp/mutation.json
 ```
 
 ### Option B: gofile.io
 
-For gofile.io links, the script is bundled at `gofile-downloader.ts` in this directory. No scraping or URL tagging is needed.
+For gofile.io links, the script is bundled at `./gofile-downloader.ts` in this directory. No scraping or URL tagging is needed.
 
 #### Step 1: Download
 
 ```bash
-cd /mnt/stash-data/remote/ && bun /home/claw/nixos/skills/download-video/gofile-downloader.ts "GOFILE_URL"
+cd /mnt/stash-data/remote/ && bun ./gofile-downloader.ts "GOFILE_URL"
 ```
 
 #### Step 2: Trigger Metadata Scan
