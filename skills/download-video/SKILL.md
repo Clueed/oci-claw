@@ -98,6 +98,10 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
   -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title } } }"}'
 ```
 
+## Step 5: Tag Matching
+
+Now proceed to tag matching. Read `references/tag-matching.md` and follow the workflow to fuzzy-match scraped tags, suggest mappings, get user approval, and apply them.
+
 ## When to use me
 
 Use this skill when:
