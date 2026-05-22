@@ -95,6 +95,7 @@ in
     pkgs.nixos-container
     pkgs.mosh
     pkgs.screen
+    pkgs.bun
   ];
 
   nix.settings = {
