@@ -257,8 +257,11 @@ in
         Service = {
           ExecStart = "${pkgs.bash}/bin/bash -c '. /etc/set-environment; OPENCODE_ENABLE_EXA=1 exec ${opencodePkg}/bin/opencode web --hostname 127.0.0.1 --port 4096'";
           WorkingDirectory = "/home/claw";
-          Restart = "on-failure";
+          Restart = "always";
+          RestartSec = "5s";
           Type = "simple";
+          KillSignal = "SIGTERM";
+          StandardInput = "null";
         };
         Install.WantedBy = [ "default.target" ];
       };
