@@ -85,7 +85,8 @@ in
       Service = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${pkgs.bash}/bin/bash -l -c 'podman image inspect nanoclaw-agent:latest >/dev/null 2>&1 || (cd ${nanoclawDir}/container && podman build -t nanoclaw-agent:latest .)'";
+        StandardInput = "null";
+        ExecStart = "${pkgs.bash}/bin/bash -c '. /etc/set-environment; podman image inspect nanoclaw-agent:latest >/dev/null 2>&1 || (cd ${nanoclawDir}/container && podman build -t nanoclaw-agent:latest .)'";
       };
       Install.WantedBy = [ "default.target" ];
     };
@@ -103,8 +104,9 @@ in
       Service = {
         Type = "simple";
         WorkingDirectory = nanoclawDir;
-        ExecStartPre = "${pkgs.bash}/bin/bash -l -c 'cd ${nanoclawDir} && npm install --legacy-peer-deps --silent && npm run build'";
-        ExecStart = "${pkgs.bash}/bin/bash -l -c 'cd ${nanoclawDir} && exec node dist/index.js'";
+        StandardInput = "null";
+        ExecStartPre = "${pkgs.bash}/bin/bash -c '. /etc/set-environment; cd ${nanoclawDir} && npm install --legacy-peer-deps --silent && npm run build'";
+        ExecStart = "${pkgs.bash}/bin/bash -c '. /etc/set-environment; cd ${nanoclawDir} && exec node dist/index.js'";
         Restart = "on-failure";
         RestartSec = "10";
         Environment = [ "CREDENTIAL_PROXY_HOST=0.0.0.0" ];
