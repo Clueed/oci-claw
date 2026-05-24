@@ -80,6 +80,8 @@ For gofile.io links, the script is bundled at `scripts/gofile-downloader.ts`. No
 
 #### Step 1: Download
 
+Just run the URL through the script. If it prints folder contents, ask the user which file to download — never auto-download all contents without explicit instructions.
+
 ```bash
 cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/gofile-downloader.ts "GOFILE_URL"
 ```
@@ -108,3 +110,5 @@ Use this skill when:
 - User pastes a video URL (including gofile.io links)
 - User asks to download a video from a site
 - User wants to add a new video to their stash library
+
+For gofile.io folder URLs, run the URL through the script first — its output will tell you what to do.

@@ -37,6 +37,7 @@ class Downloader {
     private session: { headers: Record<string, string> },
     private url: string,
     private password: string | null = null,
+    private filenameFilter: string | null = null,
   ) {}
 
   async run(): Promise<void> {
@@ -125,7 +126,7 @@ class Downloader {
     for (const child of Object.values(children)) {
       if (child.type === "folder") {
         await this.buildContentTreeStructure(absolutePath, child.id, password, pathingCount, fileIndex);
-      } else {
+      } else if (!this.filenameFilter || child.name === this.filenameFilter) {
         const filepath = this.resolveNamingCollision(pathingCount, absolutePath, child.name);
         this.registerFile(fileIndex, filepath, child.link!);
       }
@@ -279,11 +280,15 @@ class Manager {
   private maxWorkers = 5;
   private numberRetries = 5;
   private timeout = 30;
+  private filenameFilter: string | null = null;
 
   constructor(
     private urlOrFile: string,
     private password: string | null = null,
-  ) {}
+    filename: string | null = null,
+  ) {
+    this.filenameFilter = filename;
+  }
 
   async run(): Promise<void> {
     this.session.headers = {
@@ -294,7 +299,92 @@ class Manager {
       "Accept-Encoding": "gzip",
     };
     await this.setAccountAccessToken();
+
+    const contentId = this.extractContentId();
+    if (!contentId) return;
+
+    const jsonResponse = await this.fetchContentInfo(contentId);
+    if (!jsonResponse) return;
+
+    const data = jsonResponse.data;
+
+    if (data.type !== "folder") {
+      // Single file URL - download directly (current behavior)
+      await this.parseUrlOrFile();
+      return;
+    }
+
+    // It's a folder
+    console.log(`\nThis is a folder: "${data.name || contentId}"`);
+
+    const children: Record<string, ChildItem> = data.children || {};
+    const files = Object.values(children).filter(c => c.type === "file");
+    const subFolders = Object.values(children).filter(c => c.type === "folder");
+
+    if (files.length > 0) {
+      console.log(`\nFiles (${files.length}):`);
+      for (const f of files) {
+        console.log(`  ${f.name}`);
+      }
+    }
+
+    if (subFolders.length > 0) {
+      console.log(`\nSub-folders (${subFolders.length}):`);
+      for (const f of subFolders) {
+        console.log(`  ${f.name}/`);
+      }
+    }
+
+    if (!this.filenameFilter) {
+      console.log(`\nTo download a specific file from this folder, provide its filename as the second argument:`);
+      console.log(`  bun gofile-downloader.ts <folder-url> <filename>`);
+      return;
+    }
+
+    // Verify the requested file exists in the folder
+    const match = files.find(f => f.name === this.filenameFilter);
+    if (!match) {
+      console.error(`\nError: File "${this.filenameFilter}" not found in this folder.`);
+      return;
+    }
+
+    console.log(`\nDownloading: ${this.filenameFilter}`);
     await this.parseUrlOrFile();
+  }
+
+  private extractContentId(): string | null {
+    const parts = this.urlOrFile.split("/");
+    if (parts.length < 2 || parts[parts.length - 2] !== "d") {
+      console.error("Invalid gofile URL");
+      return null;
+    }
+    return parts[parts.length - 1];
+  }
+
+  private async fetchContentInfo(contentId: string): Promise<any> {
+    const userAgent = this.session.headers["User-Agent"] || "Mozilla/5.0";
+    const authHeader = this.session.headers["Authorization"] || "";
+    const accountToken = authHeader.replace("Bearer ", "");
+    const wt = generateWebsiteToken(userAgent, accountToken);
+
+    for (let i = 0; i < this.numberRetries; i++) {
+      try {
+        const res = await fetch(`https://api.gofile.io/contents/${contentId}?cache=true`, {
+          headers: {
+            ...this.session.headers,
+            "X-Website-Token": wt,
+            "X-BL": "en-US",
+          },
+          signal: AbortSignal.timeout(this.timeout * 1000),
+        });
+        const json = await res.json();
+        if (json.status === "ok") return json;
+      } catch {
+        continue;
+      }
+    }
+    console.error(`API error for ${contentId}`);
+    return null;
   }
 
   private async setAccountAccessToken(token?: string): Promise<void> {
@@ -335,6 +425,7 @@ class Manager {
       this.session,
       this.urlOrFile,
       this.password,
+      this.filenameFilter,
     );
     await downloader.run();
   }
@@ -342,9 +433,9 @@ class Manager {
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
-  console.error("Usage: bun gofile-downloader.ts <url> [password]");
+  console.error("Usage: bun gofile-downloader.ts <url> [filename] [password]");
   process.exit(1);
 }
 
-const manager = new Manager(args[0], args[1] || null);
+const manager = new Manager(args[0], args[2] || null, args[1] || null);
 await manager.run();
