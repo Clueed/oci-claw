@@ -72,6 +72,7 @@ in
     extraUpFlags = [
       "--hostname=${name}"
       "--timeout=30s"
+      "--operator=dev"
     ];
   };
 
