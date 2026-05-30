@@ -74,6 +74,14 @@ print(json.dumps(result, indent=2))
 EOF
 ```
 
+#### Step 7: Infer Tags from Filename
+
+Manually inspect the downloaded filename and pick out meaningful terms, ignoring noise (hashes, timestamps, scene numbers, etc.). Run fuzzy matching on the relevant terms:
+
+```bash
+bun <skill-path>/scripts/tag-fuzzy.ts --apply SCENE_ID --pretty "puke" "pmv"
+```
+
 ### Option B: gofile.io
 
 For gofile.io links, the script is bundled at `scripts/gofile-downloader.ts`. No scraping or URL tagging is needed.
@@ -100,16 +108,25 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
   -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title } } }"}'
 ```
 
+#### Step 4: Infer Tags from Filename
+
+Manually inspect the downloaded filename and pick out meaningful terms, ignoring noise. Then:
+
+```bash
+bun <skill-path>/scripts/tag-fuzzy.ts --apply SCENE_ID --pretty "term1" "term2"
+```
+
 ### Option C: PMVHaven
 
 1. Run `<skill-path>/scripts/pmvhaven-extract.ts <VIDEO_PAGE_URL>` to get the MP4 URL.
 2. Download as Option A but **omit `-f`** — the direct MP4 is best. Rename if hashed.
 3. Scan + find + update as Option A, but skip `details` and `cover_image` (causes 422).
 4. Extract hashtags with `curl -s "$VIDEO_PAGE" | rg -oP '#\w+'`, then `tag-fuzzy.ts --apply`, then `tag-add.ts pmv`.
+5. Infer Tags from Filename: manually pick meaningful terms from the filename, ignoring noise, then `tag-fuzzy.ts --apply --pretty`.
 
-## Step 5: Tag Matching
+## Step 6: Tag Matching
 
-Now proceed to tag matching. Read `references/tag-matching.md` and follow the workflow to fuzzy-match scraped tags, suggest mappings, get user approval, and apply them.
+Now proceed to tag matching. Read `references/tag-matching.md` and follow the workflow to fuzzy-match scraped tags and filename-inferred tags, suggest mappings, get user approval, and apply them.
 
 ## When to use me
 

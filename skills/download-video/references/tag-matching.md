@@ -3,6 +3,12 @@
 > **NEVER create/edit tag aliases manually in the Stash UI. Always use the `tag-add-alias.ts` script.**
 > See instructions at the end of this file.
 
+Tags come from two sources:
+1. **Scraped metadata** — tags extracted from the source URL during metadata scraping.
+2. **Filename inference** — manually pick meaningful terms from the downloaded filename, ignoring hashes, timestamps, scene numbers, and other noise. Then run them through the fuzzy-matching workflow below.
+
+Both sources go through the same fuzzy-matching workflow below.
+
 ## Step 1: Fuzzy match & auto-apply (default)
 
 Always run with `--apply <scene-id>` to auto-add exact-matching tags. Non-direct matches are returned as `pending` for manual review.
