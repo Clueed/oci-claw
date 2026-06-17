@@ -12,6 +12,8 @@ Commands:
   new <name>            Create a new empty dev container
   clone <url> [name]    Clone a GitHub repo into a dev container
   rebuild [--restart] <name>  Rebuild container after editing .devenv/extra.nix
+  start <name>          Start a stopped container
+  stop <name>           Stop a running container
   rm <name>             Destroy a dev container (project files kept)
   ls                    List dev containers
   shell <name>          Open a shell in a dev container
@@ -180,6 +182,18 @@ cmd_rebuild() {
   echo "  VS Code:  $(cmd_code "$name")"
 }
 
+cmd_start() {
+  local name=${1:?'Usage: devenv start <name>'}
+  echo "Starting container '$name'..."
+  sudo nixos-container start "$name"
+}
+
+cmd_stop() {
+  local name=${1:?'Usage: devenv stop <name>'}
+  echo "Stopping container '$name'..."
+  sudo nixos-container stop "$name"
+}
+
 cmd_rm() {
   local name=${1:?'Usage: devenv rm <name>'}
   echo "Destroying container '$name'..."
@@ -239,6 +253,8 @@ case "${1:-}" in
   new)     cmd_new "${2:-}" ;;
   clone)   cmd_clone "${2:-}" "${3:-}" ;;
   rebuild) cmd_rebuild "${@:2}" ;;
+  start)   cmd_start "${2:-}" ;;
+  stop)    cmd_stop "${2:-}" ;;
   rm)      cmd_rm "${2:-}" ;;
   ls)      cmd_ls ;;
   shell)   cmd_shell "${2:-}" ;;
