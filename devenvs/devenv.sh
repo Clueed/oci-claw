@@ -215,7 +215,11 @@ cmd_ls() {
 
 cmd_shell() {
   local name=${1:?'Usage: devenv shell <name>'}
-  sudo nixos-container login "$name"
+  # Use `nixos-container run` (nsenter) rather than `nixos-container login`
+  # (machinectl login). These containers define no getty units, so machinectl
+  # login fails with "Unit container-getty@1.service not found". nsenter
+  # inherits the host terminal and gives an interactive dev login shell.
+  sudo nixos-container run "$name" -- /run/wrappers/bin/su -l dev
 }
 
 cmd_exec() {
