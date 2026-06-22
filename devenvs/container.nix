@@ -99,6 +99,18 @@ in
   # Runs as a user systemd service; the client connects via SSH over Tailscale.
   services.vscode-server.enable = true;
 
+  # nix-ld: provides a stub ELF interpreter so the generic-Linux `node`/`rg` binaries
+  # the VS Code client downloads can run on NixOS.
+  # Needed because VS Code 1.125+/Remote-SSH 0.124+ runs an integrity check
+  # (`code-server --version`) inside `.vscode-server/cli/servers/<commit>.staging/`
+  # BEFORE the server is moved to its final path. services.vscode-server only patches
+  # the final path, so it can't catch the staging check and the install fails with
+  # "Could not start dynamically linked executable". nix-ld fixes this regardless of path.
+  # TODO(2026-06-22): revisit in a few weeks — if nixos-vscode-server is updated to also
+  # patch the .staging dir, this nix-ld line (and possibly services.vscode-server itself)
+  # may become unnecessary. See AGENTS.md "VS Code remote on containers".
+  programs.nix-ld.enable = true;
+
   environment.systemPackages = with pkgs; [
     bash
     git
