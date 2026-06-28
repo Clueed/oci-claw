@@ -32,6 +32,15 @@ let
 
     To permanently add packages, edit `.devenv/extra.nix` in the project root — then ask the user
     to run `devenv rebuild <repo-name>` on the host system to apply the changes.
+
+    **Trunk-based development.** One permanent branch `main`; everything else short-lived (hours to a day). Run the `gh` CLI workflow yourself, don't wait to be told.
+
+    - User starts work? Ask first: "Should I create a branch?" Then `git switch -c type/short-desc` (`feat/`, `fix/`, `chore/`).
+    - Keep branches small. Open longer than a day means split it.
+    - Commit often, push early, open the PR yourself: `gh pr create --draft` so CI runs.
+    - Sync before merging: `git fetch && git rebase origin/main`.
+    - Work done? Prompt to land it: "Looks done, squash-merge into `main`?" One PR becomes one commit; let the branch auto-delete.
+    - User pivots to something new? Flag it: "Let's merge this first, then branch off fresh `main`."
   '';
 in
 {
