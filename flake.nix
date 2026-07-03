@@ -45,6 +45,7 @@
             home-manager.nixosModules.home-manager
             vscode-server.nixosModules.default
             ./devenvs/container.nix
+            ./devenvs/app-server.nix
           ] ++ extraModules;
         };
 
