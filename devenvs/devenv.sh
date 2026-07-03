@@ -97,6 +97,17 @@ FLAKE
     # Examples: bun nodejs_22 python3 rustup go
   ];
 
+  # Always-on app server: builds once, then serves. Runs as a systemd system unit
+  # (app-<key>) as the dev user from this project dir -- starts on container boot,
+  # restarts on crash, survives SSH/VS Code logout, opens its port in the firewall.
+  # Logs: journalctl -u app-prod -f    Reachable at http://<name>.<tailnet>:<port>
+  # services.appServer.servers.prod = {
+  #   build   = "bun run build";                            # optional, runs first
+  #   command = "bun run preview --port 3000 --host 0.0.0.0";
+  #   port    = 3000;
+  #   environment.NODE_ENV = "production";
+  # };
+
   # nix-ld: lets the generic-Linux node/rg binaries the VS Code client downloads run on
   # NixOS. VS Code 1.125+/Remote-SSH 0.124+ runs an integrity check (`code-server
   # --version`) in a `.staging` dir before moving the server to its final path, which
