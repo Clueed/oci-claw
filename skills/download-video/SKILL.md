@@ -1,6 +1,6 @@
 ---
 name: download-video
-description: Download videos from URLs (thisvid.com, gofile.io, porn sites, etc.) using yt-dlp or gofile-downloader, scan them into stash, scrape metadata, and update the scene with title, details, tags, and cover image. Use this skill whenever a user pastes a video URL or asks to download a video from a site.
+description: Download videos from URLs (thisvid.com, gofile.io, MEGA, porn sites, etc.) using yt-dlp, megatools, or gofile-downloader, scan them into stash, scrape metadata, and update the scene with title, details, tags, and cover image. Use this skill whenever a user pastes a video URL or asks to download a video from a site.
 ---
 
 # Download Video Skill
@@ -10,6 +10,7 @@ This skill downloads videos from URLs using yt-dlp, adds them to the stash video
 ## Prerequisites
 
 - yt-dlp is available via `nix run nixpkgs#yt-dlp`
+- megatools is available via `nix run nixpkgs#megatools`
 - Stash API is running on localhost:9999
 - The video library path in stash is `/data/remote` (mounted at `/mnt/stash-data/remote/` on the host)
 
@@ -128,10 +129,51 @@ bun <skill-path>/scripts/tag-fuzzy.ts --apply SCENE_ID --pretty "term1" "term2"
 
 Now proceed to tag matching. Read `references/tag-matching.md` and follow the workflow to fuzzy-match scraped tags and filename-inferred tags, suggest mappings, get user approval, and apply them.
 
+### Option D: MEGA.nz
+
+For MEGA links (format: `https://mega.nz/file/...#...`). Uses `megatools` since yt-dlp cannot download from MEGA.
+
+#### Step 1: Download
+
+```bash
+cd /mnt/stash-data/remote/ && nix run nixpkgs#megatools -- dl "MEGA_URL"
+```
+
+- megatools auto-resumes partial downloads via `.part` files — re-run the same command if interrupted
+- The file downloads to the current directory with its original filename
+- Large files may need long timeouts (>2 min); run directly in the terminal or use a generous timeout
+
+#### Step 2: Trigger Metadata Scan
+
+```bash
+curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
+  -d '{"query":"mutation { metadataScan(input: {paths: [\"/data/remote\"], scanGenerateCovers: true, scanGeneratePreviews: true, scanGenerateSprites: true, scanGeneratePhashes: true, scanGenerateThumbnails: true}) }"}'
+```
+
+#### Step 3: Find the New Scene
+
+```bash
+curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
+  -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title } } }"}'
+```
+
+#### Step 4: Infer Tags from Filename
+
+Manually inspect the downloaded filename and pick out meaningful terms, ignoring noise. Then:
+
+```bash
+bun <skill-path>/scripts/tag-fuzzy.ts --apply SCENE_ID --pretty "term1" "term2"
+```
+
+#### Notes
+
+- MEGA links don't support URL-based metadata scraping (no `scrapeSceneURL`), so skip the scrape/update step
+- Tag inference from filename is the primary way to categorize MEGA downloads
+
 ## When to use me
 
 Use this skill when:
-- User pastes a video URL (including gofile.io links)
+- User pastes a video URL (including gofile.io links and MEGA links)
 - User asks to download a video from a site
 - User wants to add a new video to their stash library
 
