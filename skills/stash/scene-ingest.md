@@ -62,6 +62,14 @@ tag from the filename.
 All tagging — from scraped metadata or from filename inference — flows through
 the same fuzzy-matching workflow. Follow [tags-matching.md](./tags-matching.md).
 
+## Step 5: Attach performers
+
+Performer names come from the Step 3 scrape (printed, never auto-applied) or from
+other context (filename, source page). Match them against the performer DB,
+attach exact matches, and confirm the rest with the user — including whether to
+create a performer that doesn't exist yet. Follow
+[performers-matching.md](./performers-matching.md).
+
 ## Update a scene directly
 
 For fields you already have (no scraping):
