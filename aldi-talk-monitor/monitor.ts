@@ -385,7 +385,7 @@ async function fetchContractId(jar: CookieJar): Promise<string> {
   // Derive msisdn from lgrs_id cookie: base64("4915785665123") → strip "49" prefix
   const lgrsId = jar.get('www.alditalk-kundenportal.de', 'lgrs_id');
   if (!lgrsId) throw new Error('lgrs_id cookie not found — session may be invalid');
-  const e164   = atob(lgrsId);           // e.g. "4915785665123"
+  const e164   = atob(decodeURIComponent(lgrsId));  // e.g. "4915785665123"
   const msisdn = e164.startsWith('49') ? e164.slice(2) : e164;
 
   const res  = await get(jar, `${NAV_BFF}/navigation-list?msisdn=${msisdn}`, PORTAL_HEADERS);
