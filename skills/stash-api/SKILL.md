@@ -9,9 +9,14 @@ Stash API runs at `http://localhost:9999/graphql`.
 
 > `<skill-path>` below refers to this skill's absolute directory path (where this SKILL.md lives). Runnable scripts live at `<skill-path>/scripts/`.
 
-## Scene Pipeline
+## Ingesting a new scene
 
-For ingesting a scene end-to-end — metadata scan, find, URL scrape/update, and tagging — see [scene-ingest.md](./scene-ingest.md). This is the pipeline `download-video` hands off to after a download.
+**If a new file was just added to the library and needs cataloging** (e.g. handed off from the download-video skill after a download), read **[scene-ingest.md](./scene-ingest.md)** and follow it end-to-end: metadata scan → find the scene → scrape the source URL → tag.
+
+The handoff gives you these facts about the file; carry them into scene-ingest.md:
+- **Source URL** — the page to scrape, or none.
+- **Scrape support** — `full`, `title-only`, or `none` (some sources 422 on `details`/`cover_image`).
+- **Extra tags** — any tags already known from the source (applied during the tag step).
 
 ## Tag References
 

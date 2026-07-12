@@ -7,7 +7,7 @@ description: Download videos from URLs (thisvid.com, gofile.io, MEGA, porn sites
 
 This skill downloads a video from a URL, adds it to the stash video library, scrapes metadata where the source supports it, and tags the resulting scene.
 
-Every download has the same shape: **pick a download method for the source (A–D), then hand off to the `stash-api` skill to catalog it.** The download command and a few quirks differ per source; scanning, finding the scene, scraping, and tagging are identical for all of them and are owned by the **stash-api** skill (see [Cataloging in Stash](#cataloging-in-stash-after-every-download)).
+Every download has the same shape: **pick a download method for the source (A–D), then hand off to the `stash-api` skill to catalog it.** The download command and a few quirks differ per source; everything after the file lands on disk — scanning, finding the scene, scraping, tagging — is owned by the **stash-api** skill (see [Hand off to stash-api](#hand-off-to-stash-api)).
 
 ## Prerequisites
 
@@ -17,22 +17,21 @@ Every download has the same shape: **pick a download method for the source (A–
 - The video library path in stash is `/data/remote` (mounted at `/mnt/stash-data/remote/` on the host)
 
 > `<skill-path>` below refers to this skill's absolute directory path (where this SKILL.md lives).
-> `<stash-skill-path>` refers to the **stash-api** skill's directory (sibling of this skill, at `../stash-api`). All Stash-side scripts and docs — scan, find, scrape, and tag — live there.
 
 ## Choosing a download method
 
-| Source                                      | Method                                       | URL metadata scraping? |
-| ------------------------------------------- | -------------------------------------------- | ---------------------- |
-| Most sites / porn sites (thisvid.com, etc.) | [Option A: yt-dlp](#option-a-yt-dlp-default) | Yes                    |
-| gofile.io links                             | [Option B: gofile.io](#option-b-gofileio)    | No                     |
-| PMVHaven pages                              | [Option C: PMVHaven](#option-c-pmvhaven)     | Partial (title only)   |
-| MEGA.nz links (`mega.nz/file/...#...`)      | [Option D: MEGA.nz](#option-d-meganz)        | No                     |
+| Source                                      | Method                                       | Scrape support |
+| ------------------------------------------- | -------------------------------------------- | -------------- |
+| Most sites / porn sites (thisvid.com, etc.) | [Option A: yt-dlp](#option-a-yt-dlp-default) | `full`         |
+| gofile.io links                             | [Option B: gofile.io](#option-b-gofileio)    | `none`         |
+| PMVHaven pages                              | [Option C: PMVHaven](#option-c-pmvhaven)     | `title-only`   |
+| MEGA.nz links (`mega.nz/file/...#...`)      | [Option D: MEGA.nz](#option-d-meganz)        | `none`         |
 
-The last column decides whether you run the scrape step (stash-api → `scene-ingest.md` step 3). Sources without it are tagged from the filename only.
+The last column is the **scrape support** you report to stash-api at handoff. Sources with `none` are tagged from the filename only.
 
 ## Download methods
 
-Run the download, then continue to [Cataloging in Stash](#cataloging-in-stash-after-every-download).
+Run the download, then continue to [Hand off to stash-api](#hand-off-to-stash-api).
 
 ### Option A: yt-dlp (default)
 
@@ -40,7 +39,7 @@ Run the download, then continue to [Cataloging in Stash](#cataloging-in-stash-af
 cd /mnt/stash-data/remote/ && nix run nixpkgs#yt-dlp -- -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" "VIDEO_URL" -o "%(title)s.%(ext)s"
 ```
 
-Supports URL scraping — run all catalog steps, including the scrape step.
+Scrape support: **full**.
 
 ### Option B: gofile.io
 
@@ -48,17 +47,16 @@ Supports URL scraping — run all catalog steps, including the scrape step.
 cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/download-gofile.ts "GOFILE_URL"
 ```
 
-If the script prints folder contents instead of downloading, ask the user which file they want — never auto-download all contents without explicit instructions. No URL scraping: skip the scrape step.
+If the script prints folder contents instead of downloading, ask the user which file they want — never auto-download all contents without explicit instructions. Scrape support: **none** (no source page to scrape).
 
 ### Option C: PMVHaven
 
 1. Resolve the direct MP4 URL: `bun <skill-path>/scripts/resolve-pmvhaven.ts "VIDEO_PAGE_URL"`
 2. Download it like Option A but **omit `-f`** (the direct MP4 is already best). Rename the file if it downloads with a hashed name.
-3. On the scrape step, scrape **title only** (pass `--title-only`) — passing `details` or `cover_image` to `sceneUpdate` 422s on PMVHaven, so drop those fields.
-4. PMVHaven exposes hashtags on the page. Collect them and add the `pmv` tag, then feed the hashtags into the tag-matching step alongside filename terms:
+3. Scrape support: **title-only** (PMVHaven 422s if `details`/`cover_image` are written).
+4. PMVHaven exposes hashtags on the page — collect them and pass them, plus a `pmv` tag, as **extra tags** at handoff:
    ```bash
    curl -s "VIDEO_PAGE_URL" | rg -oP '#\w+'
-   bun <stash-skill-path>/scripts/create-tag.ts SCENE_ID "pmv"
    ```
 
 ### Option D: MEGA.nz
@@ -70,30 +68,18 @@ cd /mnt/stash-data/remote/ && nix run nixpkgs#megatools -- dl "MEGA_URL"
 - Auto-resumes partial downloads via `.part` files — re-run the same command if interrupted.
 - Downloads to the current directory with its original filename.
 - Large files may need long timeouts (>2 min); run directly in the terminal or use a generous timeout.
-- No URL scraping: skip the scrape step. Filename inference is the primary way to categorize MEGA downloads.
+- Scrape support: **none**. Filename inference is the primary way to categorize MEGA downloads.
 
-## Cataloging in Stash (after every download)
+## Hand off to stash-api
 
-Downloading is done — the rest of the pipeline (scan → find → scrape → tag) is
-owned by the **stash-api** skill. Follow `<stash-skill-path>/scene-ingest.md` for
-the full sequence. In brief:
+The file is now in the Stash library (`/data/remote`). Everything else — scan,
+find, scrape, tag — belongs to the **stash-api** skill. Read its `SKILL.md` and
+follow the new-scene ingest flow, carrying these facts from the download:
 
-1. **Scan + find** — trigger `metadataScan`, then `findScenes` to locate the new
-   scene. See stash-api → `scene-ingest.md` steps 1–2.
-2. **Scrape** *(Option A; Option C with `--title-only`; skip for gofile.io and MEGA)* —
-   scrape title/details/image from the URL and write them back:
-   ```bash
-   bun <stash-skill-path>/scripts/scrape-scene.ts "VIDEO_URL" SCENE_ID
-   ```
-   `scrape-scene.ts` prints the scraped tag names (ready-to-paste quoted terms)
-   plus any performers/studio for reference — feed those tags into tagging below.
-3. **Tag** — categorize the scene. Tags come from two sources that both flow
-   through the same fuzzy-matching workflow:
-   - **Scraped metadata** — the tag names printed by `scrape-scene.ts`.
-   - **Filename inference** — meaningful terms picked from the downloaded
-     filename, ignoring noise (hashes, timestamps, scene numbers, etc.).
-
-   Follow `<stash-skill-path>/tags-matching.md`.
+- **Source URL** — the page/link that was downloaded, or none.
+- **Scrape support** — `full` / `title-only` / `none`, from the source's row above.
+- **Extra tags** — any tags already known from the source (e.g. PMVHaven's `pmv`
+  and page hashtags). Otherwise stash-api tags from the filename.
 
 ## When to use me
 
