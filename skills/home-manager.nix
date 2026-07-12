@@ -8,5 +8,7 @@
     "skill-creator"
     "download-video"
     "agent-browser"
+    "stash-api"
+    "torrent"
   ];
 }
