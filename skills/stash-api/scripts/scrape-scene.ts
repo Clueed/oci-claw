@@ -8,7 +8,7 @@
  * performers, tags). Scalar fields (title/details/date/cover image/url) are
  * written straight to the scene. Tags, performers and studio come back as
  * *names*, so they're printed rather than applied: tags go through the
- * fuzzy-matcher with your approval (see references/tag-matching.md), and
+ * fuzzy-matcher with your approval (see ../tags-matching.md), and
  * performers/studio need name->ID resolution first.
  *
  * Usage:
