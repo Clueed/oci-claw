@@ -298,9 +298,9 @@ async function cmdApply(
 
 // ---- Mode 1: scrape (preview) ----
 async function cmdScrape(localId: string): Promise<void> {
-  // Fetch local performer to get name.
-  const { findPerformer: local } = await gql<{ findPerformer: { id: string; name: string } | null }>(
-    `query($id: ID!) { findPerformer(id: $id) { id name } }`,
+  // Fetch local performer to get name and urls.
+  const { findPerformer: local } = await gql<{ findPerformer: { id: string; name: string; urls?: string[] | null } | null }>(
+    `query($id: ID!) { findPerformer(id: $id) { id name urls } }`,
     { id: localId },
   );
 
@@ -371,38 +371,36 @@ async function cmdScrape(localId: string): Promise<void> {
     }
   }
 
-  // Web-scrape performer URLs for any stash-box result that has one.
+  // Web-scrape the local performer's own URLs.
   const seen = new Set<string>();
-  for (const { results } of out) {
-    for (const r of results) {
-      if (!r.url || seen.has(r.url)) continue;
-      seen.add(r.url);
+  for (const url of local.urls ?? []) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
 
-      process.stderr.write(`web-scraping ${r.url} ... `);
-      try {
-        const { scrapePerformerURL: w } = await gql<{ scrapePerformerURL: ScrapedPerformer | null }>(
-          `query($url: String!) {
-             scrapePerformerURL(url: $url) {
-               name aliases gender birthdate ethnicity country eye_color hair_color
-               height measurements fake_tits penis_length circumcised
-               career_start career_end tattoos piercings details death_date weight
-               url urls
-               tags { name }
-               stored_id
-             }
-           }`,
-          { url: r.url },
-        );
+    process.stderr.write(`web-scraping ${url} ... `);
+    try {
+      const { scrapePerformerURL: w } = await gql<{ scrapePerformerURL: ScrapedPerformer | null }>(
+        `query($url: String!) {
+           scrapePerformerURL(url: $url) {
+             name aliases gender birthdate ethnicity country eye_color hair_color
+             height measurements fake_tits penis_length circumcised
+             career_start career_end tattoos piercings details death_date weight
+             url urls
+             tags { name }
+             stored_id
+           }
+         }`,
+        { url },
+      );
 
-        if (!w || !w.name) {
-          process.stderr.write("no result\n");
-          continue;
-        }
-        process.stderr.write(`${w.name}\n`);
-        printPerformer(`web scraper (${new URL(r.url).hostname})`, w);
-      } catch (e) {
-        process.stderr.write(`error: ${e}\n`);
+      if (!w || !w.name) {
+        process.stderr.write("no result\n");
+        continue;
       }
+      process.stderr.write(`${w.name}\n`);
+      printPerformer(`web scraper (${new URL(url).hostname})`, w);
+    } catch (e) {
+      process.stderr.write(`error: ${e}\n`);
     }
   }
 }

@@ -20,6 +20,11 @@ For tag operations (find, create, update, hierarchy, aliases, orphan cleanup, me
 For full GraphQL schema details (filter types, mutation inputs, sort options), see [tags-details.md](./tags-details.md).
 For tag naming/alias/hierarchy conventions, see [tags-rules.md](./tags-rules.md).
 
+## Performer References
+
+For enriching a performer record (stash-box/URL scrape, apply, web-search fallback), see [performers.md](./performers.md).
+For matching/attaching performers to a scene during ingest, see [performers-matching.md](./performers-matching.md).
+
 ## Scripts
 
 Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://localhost:9999/graphql`):
@@ -29,3 +34,4 @@ Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://lo
 - `bun <skill-path>/scripts/create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
 - `bun <skill-path>/scripts/create-tag-alias.ts "<tag-name>" "<alias>"` — idempotently add one alias to a tag.
 - `bun <skill-path>/scripts/match-performer.ts <name>` — fuzzy-match a name against the performer DB; prints `<score>  <name>` per match.
+- `bun <skill-path>/scripts/scrape-performer.ts <local-id> [--apply <hostname>/<remote_id>]` — scrape a local performer from stash-box endpoints and their own URLs (preview); `--apply` writes one chosen candidate. See [performers.md](./performers.md).
