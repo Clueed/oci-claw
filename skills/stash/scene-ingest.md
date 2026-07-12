@@ -3,7 +3,7 @@
 The pipeline for ingesting a new file into Stash and fully cataloging it.
 
 > `<skill-path>` below refers to this skill's absolute directory (where the
-> stash-api `SKILL.md` lives). Scripts live at `<skill-path>/scripts/`.
+> stash `SKILL.md` lives). Scripts live at `<skill-path>/scripts/`.
 
 ## Step 1: Trigger a metadata scan
 

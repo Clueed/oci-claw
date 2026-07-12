@@ -1,5 +1,5 @@
 ---
-name: stash-api
+name: stash
 description: Interact with the Stash API (stashbox/Gamma) for managing scenes, performers, studios, tags, and groups. Use this skill when the user wants to query, create, update, or delete stash objects, when they mention stash metadata/scenes/performers/studios/tags.
 ---
 

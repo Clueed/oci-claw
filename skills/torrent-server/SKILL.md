@@ -1,5 +1,5 @@
 ---
-name: torrent
+name: torrent-server
 description: Manage Transmission BitTorrent client via CLI. Use this skill whenever the user wants to manage torrents - adding, removing, pausing, resuming, selecting/deselecting files, checking status, or any other torrent operations. The Transmission remote CLI (transmission-remote) is the primary interface.
 ---
 
