@@ -1,6 +1,6 @@
 ---
 name: download-video
-description: Download videos from URLs (thisvid.com, gofile.io, MEGA, porn sites, etc.), scan them into stash, scrape metadata, and update the scene with title, details, tags, and cover image. Use this skill whenever a user pastes a video URL or asks to download a video from a site.
+description: Download videos from URLs (thisvid.com, gofile.io, MEGA, bunkr, porn sites, etc.), scan them into stash, scrape metadata, and update the scene with title, details, tags, and cover image. Use this skill whenever a user pastes a video URL or asks to download a video from a site.
 ---
 
 # Download Video Skill
@@ -26,6 +26,7 @@ Every download has the same shape: **pick a download method for the source (A–
 | gofile.io links                             | [Option B: gofile.io](#option-b-gofileio)    |
 | PMVHaven pages                              | [Option C: PMVHaven](#option-c-pmvhaven)     |
 | MEGA.nz links (`mega.nz/file/...#...`)      | [Option D: MEGA.nz](#option-d-meganz)        |
+| bunkr links (`bunkr.*`, `dl.bunkr.*`)       | [Option E: bunkr](#option-e-bunkr)           |
 
 ## Download methods
 
@@ -64,6 +65,16 @@ cd /mnt/stash-data/remote/ && nix run nixpkgs#megatools -- dl "MEGA_URL"
 - Downloads to the current directory with its original filename.
 - Large files may need long timeouts (>2 min); run directly in the terminal or use a generous timeout.
 
+### Option E: bunkr
+
+```bash
+cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/download-bunkr.ts "BUNKR_URL_OR_FILE_ID"
+```
+
+- Accepts either a `dl.bunkr.*` download-page URL (the numeric file ID is extracted from `/file/<id>`) or a bare numeric file ID.
+- The script runs the full bunkr flow itself: resolve the file ID, request download metadata (`/api/_001_v2`) for the CDN host and storage path, sign the path (`glb-apisign.cdn.cr/sign`), then download. CDN tokens expire in ~1hr, so re-run the script rather than reusing a stale URL.
+- Downloads to the current directory using the original filename; the script prints that filename on success.
+
 ## Hand off to stash-api
 
 The file is now in the Stash library (`/data/remote`). Everything else — scan,
@@ -80,7 +91,7 @@ the scene once stash-api reports the catalogued scene ID:
 
 Use this skill when:
 
-- User pastes a video URL (including gofile.io links and MEGA links)
+- User pastes a video URL (including gofile.io, MEGA, and bunkr links)
 - User asks to download a video from a site
 - User wants to add a new video to their stash library
 
