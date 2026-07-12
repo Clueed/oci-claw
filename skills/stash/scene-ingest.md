@@ -57,6 +57,18 @@ bun <skill-path>/scripts/scrape-scene.ts --title-only "VIDEO_URL" SCENE_ID
 For `none`, there is no Stash scraper for the URL — skip straight to Step 4 and
 tag from the filename.
 
+### Title casing
+
+Every scene title must be in **Title Case** — capitalize the first letter of
+each significant word (minor words like `a`, `an`, `the`, `and`, `or`, `of`,
+`in`, `on`, `to` stay lowercase unless they're the first or last word).
+Abbreviations stay **UPPER CASE** (e.g. `A2M`, `POV`, `MILF`, `BBC`, `DP`).
+
+The scrape writes the source title verbatim, so after any scrape (Step 3) check
+the written title and re-normalize it with a direct `sceneUpdate` (see below) if
+it isn't already Title Case with upper-case abbreviations. The same rule applies
+to any title you set from the filename or other context.
+
 ## Step 4: Tag the scene
 
 Tag the scene by following [tags-matching.md](./tags-matching.md). Feed it the tags
