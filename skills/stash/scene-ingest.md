@@ -64,17 +64,17 @@ the Step 3 scrape returned as well as all other context (filename, source page, 
 
 ## Step 5: Attach performers
 
-Attach performers by following [performers-matching.md](./performers-matching.md).
-Feed it the performers the Step 3 scrape returned as well as all other context
-(filename, source page, user input).
-
-## Step 5: Attach performers
-
 Performer names come from the Step 3 scrape (printed, never auto-applied) or from
 other context (filename, source page). Match them against the performer DB,
 attach exact matches, and confirm the rest with the user — including whether to
 create a performer that doesn't exist yet. Follow
 [performers-matching.md](./performers-matching.md).
+
+## Step 6: Attach the studio
+
+Attach the studio by following [studios-matching.md](./studios-matching.md).
+Feed it the studio the Step 3 scrape returned as well as all other context
+(filename, source page, user input).
 
 ## Update a scene directly
 
