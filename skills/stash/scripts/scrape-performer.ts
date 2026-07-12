@@ -80,10 +80,7 @@ async function gql<T>(query: string, vars?: Record<string, unknown>): Promise<T>
   });
   const json: any = await res.json();
   if (json.errors) {
-    for (const e of json.errors) {
-      console.error("GraphQL error:", e.message);
-    }
-    process.exit(1);
+    throw new Error(json.errors.map((e: any) => e.message).join("; "));
   }
   return json.data as T;
 }
@@ -125,7 +122,10 @@ function mapScrapedToInput(
   const input: Record<string, unknown> = { id: local.id };
 
   if (r.name)                input.name = r.name;
-  if (r.aliases)             input.alias_list = r.aliases.split(/,\s*/);
+  if (r.aliases) {
+    const scraped = r.aliases.split(/,\s*/).map(a => a.trim()).filter(Boolean);
+    input.alias_list = [...new Set([...(local.alias_list ?? []), ...scraped])];
+  }
   if (r.gender)              input.gender = r.gender;
   if (r.birthdate)           input.birthdate = r.birthdate;
   if (r.ethnicity)           input.ethnicity = r.ethnicity;
@@ -144,7 +144,7 @@ function mapScrapedToInput(
   if (r.details)             input.details = r.details;
   if (r.death_date)          input.death_date = r.death_date;
   if (r.weight != null)      input.weight = parseInt(r.weight, 10) || undefined;
-  if (r.urls?.length)        input.urls = r.urls;
+  if (r.urls?.length)        input.urls = [...new Set([...(local.urls ?? []), ...r.urls])];
   if (r.images?.[0])         input.image = r.images[0];
 
   return input;
@@ -178,6 +178,10 @@ function printDiff(input: Record<string, unknown>, local: LocalPerformer): void 
 
   for (const [key, val] of Object.entries(input)) {
     if (key === "id") continue;
+    if (key === "image") {
+      console.log(`  image:       (reapplied)`);
+      continue;
+    }
     if (key === "stash_ids") {
       console.log(`  stash_id:    ${(val as any[]).map((s: any) => `${s.endpoint} = ${s.stash_id}`).join("\n               ")}`);
       continue;
@@ -444,11 +448,14 @@ async function main() {
         process.exit(1);
       }
       process.stdout.write("Enter local performer ID: ");
-      const buf = new Uint8Array(64);
-      const n = await new Promise<number>(resolve =>
-        process.stdin.read(buf, 0, 64, (_, n) => resolve(n ?? 0)),
-      );
-      localId = new TextDecoder().decode(buf.slice(0, n)).trim();
+      localId = (await new Promise<string>(resolve => {
+        process.stdin.resume();
+        process.stdin.setEncoding("utf8");
+        process.stdin.once("data", d => {
+          process.stdin.pause();
+          resolve(String(d));
+        });
+      })).trim();
       if (!localId) process.exit(0);
     }
 
@@ -456,4 +463,7 @@ async function main() {
   }
 }
 
-await main();
+main().catch(e => {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+});
