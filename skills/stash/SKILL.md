@@ -28,3 +28,4 @@ Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://lo
 - `bun <skill-path>/scripts/match-tag.ts [--apply <scene-id>] <terms...>` — fuzzy-match terms against the tag DB; `--apply` auto-adds exact matches.
 - `bun <skill-path>/scripts/create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
 - `bun <skill-path>/scripts/create-tag-alias.ts "<tag-name>" "<alias>"` — idempotently add one alias to a tag.
+- `bun <skill-path>/scripts/match-performer.ts <name>` — fuzzy-match a name against the performer DB; prints `<score>  <name>` per match.
