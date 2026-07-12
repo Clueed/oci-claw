@@ -4,7 +4,7 @@
  * Tag Alias Adder — idempotently add a single alias to a Stash tag.
  *
  * Usage:
- *   bun tag-add-alias.ts "<tag-name>" "<alias>"
+ *   bun create-tag-alias.ts "<tag-name>" "<alias>"
  *
  * Environment:
  *   STASH_URL   default: http://localhost:9999/graphql
@@ -48,7 +48,7 @@ async function main() {
   const alias = args[1];
 
   if (!tagName || !alias) {
-    console.error("Usage: bun tag-add-alias.ts \"<tag-name>\" \"<alias>\"");
+    console.error("Usage: bun create-tag-alias.ts \"<tag-name>\" \"<alias>\"");
     process.exit(1);
   }
 

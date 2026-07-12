@@ -105,7 +105,7 @@ async function main() {
   const studio = s.studio?.name;
 
   if (tags.length) {
-    console.log(`\nscraped tags (${tags.length}) — feed into tag-fuzzy.ts:`);
+    console.log(`\nscraped tags (${tags.length}) — feed into match-tag.ts:`);
     console.log(tags.map(t => `"${t}"`).join(" "));
   }
   if (performers.length) console.log(`\nscraped performers: ${performers.join(", ")}`);

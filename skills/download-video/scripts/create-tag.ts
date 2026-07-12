@@ -4,7 +4,7 @@
  * Scene Tag Adder — add tags to a Stash scene by name.
  *
  * Usage:
- *   bun tag-add.ts <scene-id> "blowjob" "anal" "kissing"
+ *   bun create-tag.ts <scene-id> "blowjob" "anal" "kissing"
  *
  * Environment:
  *   STASH_URL   default: http://localhost:9999/graphql
@@ -86,7 +86,7 @@ async function main() {
   const names = args.slice(1);
 
   if (!sceneId || names.length === 0) {
-    console.error("Usage: bun tag-add.ts <scene-id> \"tag name\" ...");
+    console.error("Usage: bun create-tag.ts <scene-id> \"tag name\" ...");
     process.exit(1);
   }
 

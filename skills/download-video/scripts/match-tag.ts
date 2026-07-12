@@ -5,12 +5,12 @@
  * Outputs JSON for agent consumption.
  *
  * Usage:
- *   bun tag-fuzzy.ts "dirty atm" "shitty ass"
- *   printf "dirty atm\nshitty ass" | bun tag-fuzzy.ts
- *   bun tag-fuzzy.ts --threshold 0.4 < tags.txt
- *   bun tag-fuzzy.ts --threshold 0.4 --top 3 "dirty atm"
- *   bun tag-fuzzy.ts --pretty "dirty atm"
- *   bun tag-fuzzy.ts --apply <scene-id> "dirty atm" "blowjob"
+ *   bun match-tag.ts "dirty atm" "shitty ass"
+ *   printf "dirty atm\nshitty ass" | bun match-tag.ts
+ *   bun match-tag.ts --threshold 0.4 < tags.txt
+ *   bun match-tag.ts --threshold 0.4 --top 3 "dirty atm"
+ *   bun match-tag.ts --pretty "dirty atm"
+ *   bun match-tag.ts --apply <scene-id> "dirty atm" "blowjob"
  *
  * Environment:
  *   STASH_URL   default: http://localhost:9999/graphql
@@ -123,9 +123,9 @@ async function main() {
   }
 
   if (names.length === 0) {
-    console.error("Usage: bun tag-fuzzy.ts [--threshold 0.7] [--top 3] <tag names...>");
-    console.error("       printf 'dirty atm\\nshitty ass' | bun tag-fuzzy.ts");
-    console.error("       bun tag-fuzzy.ts --apply <scene-id> <tag names...>");
+    console.error("Usage: bun match-tag.ts [--threshold 0.7] [--top 3] <tag names...>");
+    console.error("       printf 'dirty atm\\nshitty ass' | bun match-tag.ts");
+    console.error("       bun match-tag.ts --apply <scene-id> <tag names...>");
     process.exit(1);
   }
 

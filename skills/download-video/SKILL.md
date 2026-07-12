@@ -57,7 +57,7 @@ If the script prints folder contents instead of downloading, ask the user which 
 4. PMVHaven exposes hashtags on the page. Collect them and add the `pmv` tag, then feed the hashtags into the tag-matching step alongside filename terms:
    ```bash
    curl -s "VIDEO_PAGE_URL" | rg -oP '#\w+'
-   bun <skill-path>/scripts/tag-add.ts SCENE_ID "pmv"
+   bun <skill-path>/scripts/create-tag.ts SCENE_ID "pmv"
    ```
 
 ### Option D: MEGA.nz
