@@ -20,7 +20,7 @@ bun run <skill-path>/scripts/tag-fuzzy.ts --apply <scene-id> "blowjob" "anal" "a
 For human-readable output, add `--pretty`:
 
 ```bash
-bun run <skill-path>/scripts/tag-fuzzy.ts --apply <scene-id> --pretty "blowjob" "anal" "ass fucking"
+bun run <skill-path>/scripts/tag-fuzzy.ts --apply <scene-id> "blowjob" "anal" "ass fucking"
 ```
 
 Output: `{auto_applied: [{name, scraped}], pending: [{scraped, matches}]}`
