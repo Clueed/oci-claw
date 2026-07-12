@@ -26,7 +26,6 @@ Tags without any scenes, markers, images, galleries, performers, or studios are 
 ### Find Tags
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTags(filter: {}, tag_filter: {}) { tags { id name } } }"}'
 ```
 Note: `findTags` does not support pagination (`page`/`page_size`). Use `filter: { q: "NAME" }` for searching, or fetch all tags at once (API returns up to the server's default limit).
@@ -34,14 +33,12 @@ Note: `findTags` does not support pagination (`page`/`page_size`). Use `filter: 
 ### Find Tags with Aliases
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTags(filter: { q: \"QUERY\" }, tag_filter: {}) { tags { id name aliases } } }"}'
 ```
 
 ### Get Tag Hierarchy (parents + children)
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTag(id: \"TAG_ID\") { id name parents { id name } children { id name child_count parent_count } } }"}'
 ```
 
@@ -49,14 +46,12 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 ```bash
 # Find all children of a tag up to depth N
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTags(tag_filter: { children: { value: [\"PARENT_ID\"], modifier: INCLUDES, depth: 2 } }) { tags { id name parent_count child_count } } }"}'
 ```
 
 ### Find Orphan Tags (no scenes, images, etc.)
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTags(filter: {}, tag_filter: { scene_count: { value: 0, modifier: EQUALS }, image_count: { value: 0, modifier: EQUALS }, gallery_count: { value: 0, modifier: EQUALS }, performer_count: { value: 0, modifier: EQUALS }, studio_count: { value: 0, modifier: EQUALS } }) { tags { id name scene_count image_count gallery_count performer_count studio_count } } }"}'
 ```
 
@@ -65,7 +60,6 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 # Resolve multiple search terms to their canonical tag names
 for term in "lesbian girls" "Japanese actress" "bbw"; do
   curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-    -H "ApiKey: $STASH_API_KEY" \
     -d "{\"query\":\"{ findTags(filter: { q: \\\"$term\\\" }, tag_filter: {}) { tags { name aliases } } }\"}"
 done
 ```
@@ -73,7 +67,6 @@ done
 ### Merge Tags (move all associations to destination)
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"mutation { tagsMerge(source: [\"SOURCE_ID_1\", \"SOURCE_ID_2\"], destination: \"DEST_ID\") { id } }"}'
 ```
 

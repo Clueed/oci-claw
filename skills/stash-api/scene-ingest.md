@@ -11,7 +11,6 @@ Picks up new files on disk. The library path in stash is `/data/remote`.
 
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"mutation { metadataScan(input: {paths: [\"/data/remote\"], scanGenerateCovers: true, scanGeneratePreviews: true, scanGenerateSprites: true, scanGeneratePhashes: true, scanGenerateThumbnails: true}) }"}'
 ```
 
@@ -22,7 +21,6 @@ seconds and retry if it's not there yet.
 
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title urls } } }"}'
 ```
 
@@ -70,6 +68,5 @@ For fields you already have (no scraping):
 
 ```bash
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"mutation { sceneUpdate(input: {id: \"ID\", title: \"TITLE\", details: \"DETAILS\", urls: [\"URL\"]}) { id } }"}'
 ```

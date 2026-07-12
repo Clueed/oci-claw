@@ -53,7 +53,6 @@ type Tag {
 ```bash
 curl -s -X POST http://localhost:9999/graphql \
   -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
   -d '{"query":"{ findTags(filter: { q: \"Japanese\" }, tag_filter: {}) { tags { id name parents { id name } children { id name } } } }"}'
 ```
 
@@ -90,7 +89,7 @@ findTags(tag_filter: {
 
 ```bash
 curl -s -X POST http://localhost:9999/graphql \
-  -H "ApiKey: $STASH_API_KEY" \
+  -H "Content-Type: application/json" \
   -d '{"query":"mutation { tagCreate(input: {name: \"Japanese\", aliases: [\"Japanese Actress\"], parent_ids: [\"parent_id\"]}) { id name aliases } }"}'
 ```
 
