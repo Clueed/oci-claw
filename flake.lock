@@ -320,17 +320,16 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1777181208,
-        "narHash": "sha256-7wtAatvn3y+3XYbvdSVTC1c+zz3ANnoO7sEkSokRDWc=",
+        "lastModified": 1783801917,
+        "narHash": "sha256-0e0fCA2LhkBF67+eJWqUEGz5oVtwulPqZuq/g3HeGhE=",
         "owner": "sst",
         "repo": "opencode",
-        "rev": "5a5a2e5fa0c9f1ee965f3eaff5c787a856dd1734",
+        "rev": "34e58090595d44e3e7cc37498f16753a98627456",
         "type": "github"
       },
       "original": {
         "owner": "sst",
         "repo": "opencode",
-        "rev": "5a5a2e5fa0c9f1ee965f3eaff5c787a856dd1734",
         "type": "github"
       }
     },
