@@ -2,7 +2,7 @@
 
 /**
  * Performer Fuzzy Finder — match a query against the Stash performer database.
- * Prints matches, one per line: "<score>  <name>".
+ * Prints matches, one per line: "<score>  <id>  <name>".
  *
  * Usage:
  *   bun match-performer.ts "kaitlyn katsaros"
@@ -45,14 +45,14 @@ if (!query) {
   process.exit(1);
 }
 
-const all: { name: string; alias_list: string[] }[] = [];
+const all: { id: string; name: string; alias_list: string[] }[] = [];
 let page = 1;
 while (true) {
   const res = await fetch(STASH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      query: `query($p: Int!) { findPerformers(filter: { page: $p, per_page: 200, sort: "name" }) { performers { name alias_list } count } }`,
+      query: `query($p: Int!) { findPerformers(filter: { page: $p, per_page: 200, sort: "name" }) { performers { id name alias_list } count } }`,
       variables: { p: page },
     }),
   });
@@ -68,6 +68,7 @@ while (true) {
 
 const matches = all
   .map(p => ({
+    id: p.id,
     name: p.name,
     score: Math.max(
       similarity(query, p.name),
@@ -77,4 +78,4 @@ const matches = all
   .filter(m => m.score >= 0.7)
   .sort((a, b) => b.score - a.score);
 
-for (const m of matches) console.log(`${m.score.toFixed(2)}  ${m.name}`);
+for (const m of matches) console.log(`${m.score.toFixed(2)}  ${m.id}  ${m.name}`);
