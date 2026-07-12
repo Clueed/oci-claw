@@ -1,9 +1,10 @@
 # Tag Matching
 
-> **NEVER create/edit tag aliases manually in the Stash UI. Always use the `create-tag-alias.ts` script.**
+> **NEVER create/edit tag aliases manually in the Stash UI. Always use the scripts.**
 > See instructions at the end of this file.
 
 Tags come from two sources:
+
 1. **Scraped metadata** — tags extracted from the source URL during metadata scraping.
 2. **Filename inference** — manually pick meaningful terms from the downloaded filename, ignoring hashes, timestamps, scene numbers, and other noise. Then run them through the fuzzy-matching workflow below.
 
@@ -38,34 +39,38 @@ Present the user with a proposed mapping of each `pending` scraped tag → Stash
 **Do not proceed to apply tags without user approval.**
 
 ### Rule 1: Direct match (case-insensitive)
+
 If the scraped tag matches a Stash tag name exactly (case-insensitive), use `(direct)`.
 
-| Scraped | Suggestion |
-|---|---|
+| Scraped      | Suggestion                            |
+| ------------ | ------------------------------------- |
 | anal fucking | anal fucking -> anal fucking (direct) |
-| blowjob | blowjob -> blowjob (direct) |
-| kissing | kissing -> kissing (direct) |
+| blowjob      | blowjob -> blowjob (direct)           |
+| kissing      | kissing -> kissing (direct)           |
 
 ### Rule 2: Known synonym → create alias
+
 Map synonymous terms to a canonical Stash tag and add the synonym as an alias.
 
-| Synonym(s) | Suggestion |
-|---|---|
-| ass fucking | ass fucking -> anal fucking (create alias) |
-| deep throat, deepthroat | deep throat -> blowjob (create alias) |
-| cunnilingus | cunnilingus -> pussy licking (create alias) |
-| pussy eating | pussy eating -> pussy licking (create alias) |
+| Synonym(s)              | Suggestion                                   |
+| ----------------------- | -------------------------------------------- |
+| ass fucking             | ass fucking -> anal fucking (create alias)   |
+| deep throat, deepthroat | deep throat -> blowjob (create alias)        |
+| cunnilingus             | cunnilingus -> pussy licking (create alias)  |
+| pussy eating            | pussy eating -> pussy licking (create alias) |
 
 ### Rule 3: Spelling/spacing variant → create alias
+
 When the scraped tag is a minor spelling or spacing variation of an existing tag, add it as an alias.
 
-| Scraped | Suggestion | Alias to add |
-|---|---|---|
-| dick sucking | dick sucking -> blowjob (create alias) | "dick sucking" |
+| Scraped       | Suggestion                                 | Alias to add    |
+| ------------- | ------------------------------------------ | --------------- |
+| dick sucking  | dick sucking -> blowjob (create alias)     | "dick sucking"  |
 | dirty talking | dirty talking -> dirty talk (create alias) | "dirty talking" |
-| face sitting | face sitting -> facesitting (create alias) | "face sitting" |
+| face sitting  | face sitting -> facesitting (create alias) | "face sitting"  |
 
 ### Rule 4: Unmatched → skip
+
 Show as `<scraped> -> (skip)`. No tag created, no alias added.
 
 ## Step 3: Apply approved tags to scene

@@ -11,12 +11,7 @@ Stash API runs at `http://localhost:9999/graphql`.
 
 ## Ingesting a new scene
 
-**If a new file was just added to the library and needs cataloging** (e.g. handed off from the download-video skill after a download), read **[scene-ingest.md](./scene-ingest.md)** and follow it end-to-end: metadata scan → find the scene → scrape the source URL → tag.
-
-The handoff gives you these facts about the file; carry them into scene-ingest.md:
-- **Source URL** — the page to scrape, or none.
-- **Scrape support** — `full`, `title-only`, or `none` (some sources 422 on `details`/`cover_image`).
-- **Extra tags** — any tags already known from the source (applied during the tag step).
+**If a new file was just added to the library and needs cataloging** (e.g. handed off from the download-video skill after a download), read **[scene-ingest.md](./scene-ingest.md)** and follow it end-to-end.
 
 ## Tag References
 
@@ -34,58 +29,11 @@ Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://lo
 - `create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
 - `create-tag-alias.ts "<tag-name>" "<alias>"` — idempotently add one alias to a tag.
 
-## Authentication
-
-Set `STASH_API_KEY` environment variable (from `/run/secrets/stash_api_key`).
-
-## Common Operations
-
-### Find Scenes
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }, scene_filter: {}) { scenes { id title urls paths { webp } } } }"}'
-```
-
-### Scrape Scene URL
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ scrapeSceneURL(url: \"URL\") { title details date image studio { name } performers { name } tags { name } } }"}'
-```
-
-### Update Scene
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"mutation { sceneUpdate(input: {id: \"ID\", title: \"TITLE\", details: \"DETAILS\", urls: [\"URL\"]}) { id } }"}'
-```
-
-### Metadata Scan
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"mutation { metadataScan(input: {paths: [\"/data/remote\"], scanGenerateCovers: true}) }"}'
-```
-
-### Find Performers
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ findPerformers(filter: { q: \"NAME\" }) { performers { id name image } } }"}'
-```
-
-### Find Studios
-```bash
-curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
-  -H "ApiKey: $STASH_API_KEY" \
-  -d '{"query":"{ findStudios(filter: { q: \"NAME\" }) { studios { id name url } } }"}'
-```
 
 ## When to use me
 
 Use this skill when:
+
 - User wants to query, create, update, or delete stash objects
 - User mentions stash metadata, scenes, performers, studios, tags
 - User wants to interact with their stash database via GraphQL
-- Another skill (e.g. download-video) needs to scan, find, scrape, or tag a scene — see [scene-ingest.md](./scene-ingest.md)
