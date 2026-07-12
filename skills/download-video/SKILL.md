@@ -93,44 +93,23 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 
 **Only for sources that support URL scraping** (Option A; Option C with title only). Skip entirely for gofile.io and MEGA.
 
-Scrapes title/details/image from the URL and updates the scene in one shot, using Python to safely build the JSON:
+Scrapes title/details/image from the URL and writes them back to the scene (along with the source URL) in one shot:
 
 ```bash
-nix run nixpkgs#python3 << 'EOF'
-import json, urllib.request
-
-VIDEO_URL = "VIDEO_URL"
-SCENE_ID = "SCENE_ID"
-
-# Scrape metadata
-query = {"query": '{ scrapeSceneURL(url: "' + VIDEO_URL + '") { title details image } }'}
-req = urllib.request.Request("http://localhost:9999/graphql", data=json.dumps(query).encode(), headers={"Content-Type": "application/json"})
-resp = json.loads(urllib.request.urlopen(req).read().decode())
-scraped = resp["data"]["scrapeSceneURL"]
-
-# Build update mutation with proper JSON escaping
-update = {
-    "query": "mutation { sceneUpdate(input: {id: \"" + SCENE_ID + "\", title: $title, details: $details, urls: [\"" + VIDEO_URL + "\"], cover_image: $image}) { id } }",
-    "variables": {
-        "title": scraped["title"],
-        "details": scraped["details"],
-        "image": scraped["image"]
-    }
-}
-
-req2 = urllib.request.Request("http://localhost:9999/graphql", data=json.dumps(update).encode(), headers={"Content-Type": "application/json"})
-result = json.loads(urllib.request.urlopen(req2).read().decode())
-print(json.dumps(result, indent=2))
-EOF
+bun <skill-path>/scripts/scrape-update.ts "VIDEO_URL" SCENE_ID
 ```
 
-> **PMVHaven (Option C):** keep only `title` — drop `details` and `cover_image` from both the scrape query and the mutation. Those fields 422 on PMVHaven.
+> **PMVHaven (Option C):** add `--title-only` — passing `details` or `cover_image` to `sceneUpdate` 422s on PMVHaven, so the flag scrapes and writes just the title:
+>
+> ```bash
+> bun <skill-path>/scripts/scrape-update.ts --title-only "VIDEO_URL" SCENE_ID
+> ```
 
 ### Step 4: Tag matching
 
 This is where scenes get categorized. Tags come from two sources that both flow through the same fuzzy-matching workflow:
 
-1. **Scraped metadata** — tags from the source URL (where scraping is supported).
+1. **Scraped metadata** — where step 3 ran, `scrape-update.ts` prints the scraped tag names (as ready-to-paste quoted terms), plus any scraped performers/studio for reference. Feed those tags into the matcher.
 2. **Filename inference** — inspect the downloaded filename and pick out meaningful terms, ignoring noise (hashes, timestamps, scene numbers, etc.).
 
 Read `references/tag-matching.md` and follow it.
