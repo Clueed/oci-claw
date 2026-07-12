@@ -59,8 +59,14 @@ tag from the filename.
 
 ## Step 4: Tag the scene
 
-All tagging — from scraped metadata or from filename inference — flows through
-the same fuzzy-matching workflow. Follow [tags-matching.md](./tags-matching.md).
+Tag the scene by following [tags-matching.md](./tags-matching.md). Feed it the tags
+the Step 3 scrape returned as well as all other context (filename, source page, user input).
+
+## Step 5: Attach performers
+
+Attach performers by following [performers-matching.md](./performers-matching.md).
+Feed it the performers the Step 3 scrape returned as well as all other context
+(filename, source page, user input).
 
 ## Step 5: Attach performers
 
