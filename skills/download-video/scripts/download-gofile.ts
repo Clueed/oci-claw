@@ -337,7 +337,7 @@ class Manager {
 
     if (!this.filenameFilter) {
       console.log(`\nTo download a specific file from this folder, provide its filename as the second argument:`);
-      console.log(`  bun gofile-downloader.ts <folder-url> <filename>`);
+      console.log(`  bun download-gofile.ts <folder-url> <filename>`);
       return;
     }
 
@@ -433,7 +433,7 @@ class Manager {
 
 const args = process.argv.slice(2);
 if (args.length < 1) {
-  console.error("Usage: bun gofile-downloader.ts <url> [filename] [password]");
+  console.error("Usage: bun download-gofile.ts <url> [filename] [password]");
   process.exit(1);
 }
 

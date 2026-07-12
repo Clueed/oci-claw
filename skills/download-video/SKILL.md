@@ -44,14 +44,14 @@ Supports URL scraping — run all shared steps, including step 3.
 ### Option B: gofile.io
 
 ```bash
-cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/gofile-downloader.ts "GOFILE_URL"
+cd /mnt/stash-data/remote/ && bun <skill-path>/scripts/download-gofile.ts "GOFILE_URL"
 ```
 
 If the script prints folder contents instead of downloading, ask the user which file they want — never auto-download all contents without explicit instructions. No URL scraping: skip shared step 3.
 
 ### Option C: PMVHaven
 
-1. Resolve the direct MP4 URL: `bun <skill-path>/scripts/pmvhaven-extract.ts "VIDEO_PAGE_URL"`
+1. Resolve the direct MP4 URL: `bun <skill-path>/scripts/resolve-pmvhaven.ts "VIDEO_PAGE_URL"`
 2. Download it like Option A but **omit `-f`** (the direct MP4 is already best). Rename the file if it downloads with a hashed name.
 3. On shared step 3, scrape **title only** — passing `details` or `cover_image` to `sceneUpdate` 422s on PMVHaven, so drop those fields.
 4. PMVHaven exposes hashtags on the page. Collect them and add the `pmv` tag, then feed the hashtags into the tag-matching step alongside filename terms:
@@ -96,20 +96,20 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 Scrapes title/details/image from the URL and writes them back to the scene (along with the source URL) in one shot:
 
 ```bash
-bun <skill-path>/scripts/scrape-update.ts "VIDEO_URL" SCENE_ID
+bun <skill-path>/scripts/scrape-scene.ts "VIDEO_URL" SCENE_ID
 ```
 
 > **PMVHaven (Option C):** add `--title-only` — passing `details` or `cover_image` to `sceneUpdate` 422s on PMVHaven, so the flag scrapes and writes just the title:
 >
 > ```bash
-> bun <skill-path>/scripts/scrape-update.ts --title-only "VIDEO_URL" SCENE_ID
+> bun <skill-path>/scripts/scrape-scene.ts --title-only "VIDEO_URL" SCENE_ID
 > ```
 
 ### Step 4: Tag matching
 
 This is where scenes get categorized. Tags come from two sources that both flow through the same fuzzy-matching workflow:
 
-1. **Scraped metadata** — where step 3 ran, `scrape-update.ts` prints the scraped tag names (as ready-to-paste quoted terms), plus any scraped performers/studio for reference. Feed those tags into the matcher.
+1. **Scraped metadata** — where step 3 ran, `scrape-scene.ts` prints the scraped tag names (as ready-to-paste quoted terms), plus any scraped performers/studio for reference. Feed those tags into the matcher.
 2. **Filename inference** — inspect the downloaded filename and pick out meaningful terms, ignoring noise (hashes, timestamps, scene numbers, etc.).
 
 Read `references/tag-matching.md` and follow it.

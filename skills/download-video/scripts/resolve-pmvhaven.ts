@@ -2,7 +2,7 @@
 
 const url = process.argv[2];
 if (!url) {
-  console.error("Usage: bun pmvhaven-extract.ts <video-page-url>");
+  console.error("Usage: bun resolve-pmvhaven.ts <video-page-url>");
   process.exit(1);
 }
 

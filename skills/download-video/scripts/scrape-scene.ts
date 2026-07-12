@@ -12,8 +12,8 @@
  * performers/studio need name->ID resolution first.
  *
  * Usage:
- *   bun scrape-update.ts <video-url> <scene-id>
- *   bun scrape-update.ts --title-only <video-url> <scene-id>   # PMVHaven: title only
+ *   bun scrape-scene.ts <video-url> <scene-id>
+ *   bun scrape-scene.ts --title-only <video-url> <scene-id>   # PMVHaven: title only
  *
  * --title-only scrapes and writes just the title. Passing details/cover_image
  * to sceneUpdate 422s on some sources (e.g. PMVHaven), so use it there.
@@ -59,7 +59,7 @@ async function main() {
   const [videoUrl, sceneId] = args.filter(a => a !== "--title-only");
 
   if (!videoUrl || !sceneId) {
-    console.error('Usage: bun scrape-update.ts [--title-only] <video-url> <scene-id>');
+    console.error('Usage: bun scrape-scene.ts [--title-only] <video-url> <scene-id>');
     process.exit(1);
   }
 
