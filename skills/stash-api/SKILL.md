@@ -1,6 +1,6 @@
 ---
 name: stash-api
-description: Interact with the Stash API (stashbox/Gamma) for managing scenes, performers, studios, tags, and movies. Owns the scene-cataloging pipeline (metadata scan, find, URL scrape, tag) and the tag-matching workflow/scripts. Use this skill when the user wants to query, create, update, or delete stash objects, when they mention stash metadata/scenes/performers/studios/tags, or when another skill (e.g. download-video) needs to scan, scrape, or tag a scene.
+description: Interact with the Stash API (stashbox/Gamma) for managing scenes, performers, studios, tags, and groups. Use this skill when the user wants to query, create, update, or delete stash objects, when they mention stash metadata/scenes/performers/studios/tags.
 ---
 
 # Stash API Skill
@@ -24,16 +24,7 @@ For tag naming/alias/hierarchy conventions, see [tags-rules.md](./tags-rules.md)
 
 Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://localhost:9999/graphql`):
 
-- `scrape-scene.ts <url> <scene-id> [--title-only]` — scrape a source URL via `scrapeSceneURL` and write scalar fields back; prints scraped tags/performers/studio.
-- `match-tag.ts [--apply <scene-id>] <terms...>` — fuzzy-match terms against the tag DB; `--apply` auto-adds exact matches.
-- `create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
-- `create-tag-alias.ts "<tag-name>" "<alias>"` — idempotently add one alias to a tag.
-
-
-## When to use me
-
-Use this skill when:
-
-- User wants to query, create, update, or delete stash objects
-- User mentions stash metadata, scenes, performers, studios, tags
-- User wants to interact with their stash database via GraphQL
+- `bun <skill-path>/scripts/scrape-scene.ts <url> <scene-id> [--title-only]` — scrape a source URL via `scrapeSceneURL` and write scalar fields back; prints scraped tags/performers/studio.
+- `bun <skill-path>/scripts/match-tag.ts [--apply <scene-id>] <terms...>` — fuzzy-match terms against the tag DB; `--apply` auto-adds exact matches.
+- `bun <skill-path>/scripts/create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
+- `bun <skill-path>/scripts/create-tag-alias.ts "<tag-name>" "<alias>"` — idempotently add one alias to a tag.

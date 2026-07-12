@@ -15,16 +15,12 @@ Both sources go through the same fuzzy-matching workflow below.
 Always run with `--apply <scene-id>` to auto-add exact-matching tags. Non-direct matches are returned as `pending` for manual review.
 
 ```bash
-bun run <skill-path>/scripts/match-tag.ts --apply <scene-id> "blowjob" "anal" "ass fucking"
-```
-
-For human-readable output, add `--pretty`:
-
-```bash
-bun run <skill-path>/scripts/match-tag.ts --apply <scene-id> "blowjob" "anal" "ass fucking"
+bun <skill-path>/scripts/match-tag.ts --apply <scene-id> "blowjob" "anal" "ass fucking"
 ```
 
 Output: `{auto_applied: [{name, scraped}], pending: [{scraped, matches}]}`
+
+Add `--pretty` for indented, human-readable output.
 
 Tags in `auto_applied` are exact matches (score 1.0) already added to the scene — no further action needed.
 
@@ -78,7 +74,7 @@ Show as `<scraped> -> (skip)`. No tag created, no alias added.
 Once the user approves pending mappings, add them to the scene by name:
 
 ```bash
-bun run <skill-path>/scripts/create-tag.ts <scene-id> "ass fucking" "dirty talk"
+bun <skill-path>/scripts/create-tag.ts <scene-id> "ass fucking" "dirty talk"
 ```
 
 The script fuzzy-matches each name against your Stash tag DB and adds them idempotently.
@@ -90,7 +86,7 @@ The script fuzzy-matches each name against your Stash tag DB and adds them idemp
 When a scraped tag needs a new alias on an existing Stash tag (Rules 2-3), **always** use:
 
 ```bash
-bun run <skill-path>/scripts/create-tag-alias.ts "<tag-name>" "<alias>"
+bun <skill-path>/scripts/create-tag-alias.ts "<tag-name>" "<alias>"
 ```
 
 The script looks up the tag by name, fetches current aliases, and adds the new one (idempotent — no-op if already exists). One alias per invocation.

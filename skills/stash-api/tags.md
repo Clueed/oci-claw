@@ -28,7 +28,7 @@ Tags without any scenes, markers, images, galleries, performers, or studios are 
 curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
   -d '{"query":"{ findTags(filter: {}, tag_filter: {}) { tags { id name } } }"}'
 ```
-Note: `findTags` does not support pagination (`page`/`page_size`). Use `filter: { q: "NAME" }` for searching, or fetch all tags at once (API returns up to the server's default limit).
+Note: `findTags` supports pagination via `filter: { page: N, per_page: M }` and returns a `count` field for looping until all tags are fetched (see `scripts/match-tag.ts`). Use `filter: { q: "NAME" }` to search by name/alias.
 
 ### Find Tags with Aliases
 ```bash
