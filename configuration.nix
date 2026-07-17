@@ -33,6 +33,7 @@ in
     ./aldi-talk-monitor/aldi-talk-monitor.nix
     ./services/transmission.nix
     ./services/image-gallery.nix
+    ./services/samba.nix
   ];
 
   sops.defaultSopsFile = ./secrets.yaml;
