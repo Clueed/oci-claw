@@ -5,10 +5,17 @@
 # Locked to the Tailscale interface only — never exposed to the public internet.
 # Connect from macOS Finder with Cmd-K:  smb://ociclaw-1.<tailnet>/projects
 #
-# One-time credential setup (Samba keeps its own password DB, not PAM):
-#   sudo smbpasswd -a claw
-{ ... }:
+# The SMB password is provisioned declaratively from a sops secret
+# (smb_password) by the activation step at the bottom of this file — Samba keeps
+# its own password DB (passdb.tdb, not PAM), so this keeps it reproducible.
+{ pkgs, config, ... }:
 {
+  # Encrypted SMB password for the `claw` Samba account. Set its value with:
+  #   SOPS_AGE_KEY=$(sudo nix run nixpkgs#ssh-to-age -- -private-key \
+  #     -i /etc/ssh/ssh_host_ed25519_key) \
+  #     sops set secrets.yaml '["smb_password"]' '"your-password"'
+  sops.secrets.smb_password = { };
+
   services.samba = {
     enable = true;
     # We open the firewall per-interface below (tailscale0 only), not globally.
@@ -52,20 +59,25 @@
     };
   };
 
-  # WSDD lets macOS Finder auto-discover the host under "Network" without typing
-  # the address. Tailscale-only via the same interface guard.
-  services.samba-wsdd = {
-    enable = true;
-    openFirewall = false;
-    interface = "tailscale0";
-  };
+  # smbd (445) reachable only over Tailscale. No WS-Discovery / mDNS daemon:
+  # both rely on multicast, which Tailscale (unicast-only overlay) does not
+  # carry, so Finder can't auto-discover the host anyway. Connect explicitly
+  # to the MagicDNS name and save it as a Finder favourite for one-click access.
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 445 ];
 
-  # Reachable only over Tailscale: smbd (445), plus WSD discovery (3702/udp, 5357/tcp).
-  networking.firewall.interfaces.tailscale0 = {
-    allowedTCPPorts = [
-      445
-      5357
-    ];
-    allowedUDPPorts = [ 3702 ];
+  # Apply the sops-managed password to Samba's passdb on every switch/boot.
+  # Ordered after "setupSecrets" so /run/secrets/smb_password exists. smbpasswd
+  # only edits passdb.tdb (no running smbd needed) and reads the generated
+  # /etc/samba/smb.conf, both present at activation time. Idempotent: -a both
+  # creates the entry and updates the password on later runs.
+  system.activationScripts.samba-password = {
+    deps = [ "setupSecrets" ];
+    text = ''
+      if [ -f ${config.sops.secrets.smb_password.path} ]; then
+        pass=$(cat ${config.sops.secrets.smb_password.path})
+        printf '%s\n%s\n' "$pass" "$pass" \
+          | ${pkgs.samba}/bin/smbpasswd -a -s claw
+      fi
+    '';
   };
 }
