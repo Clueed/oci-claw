@@ -29,7 +29,9 @@ _write_nspawn_flags() {
   local project_dir=$2
   local mode=$3
 
-  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/run/secrets/github_pat:/etc/secrets/github_pat --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json --bind=/home/claw/.claude/.credentials.json:/home/dev/.claude/.credentials.json --bind=/home/claw/.claude.json:/home/dev/.claude.json"
+  # GitHub auth is NOT bind-mounted: the host's github-token service writes a
+  # per-container, repo-scoped 1h token to the container's /etc/secrets/github_token.
+  local base_flags="--bind=$project_dir:/home/dev/$name --bind-ro=/home/claw/.config/git/config:/etc/gitconfig --bind-ro=/run/secrets/tailscale_devenv_auth_key:/etc/secrets/ts_auth_key --bind-ro=/home/claw/.local/share/opencode/auth.json:/home/dev/.local/share/opencode/auth.json --bind=/home/claw/.claude/.credentials.json:/home/dev/.claude/.credentials.json --bind=/home/claw/.claude.json:/home/dev/.claude.json"
 
   local extra_flags=""
   local flags_file="$project_dir/.devenv/nspawn-flags"
@@ -61,7 +63,16 @@ _create_container() {
   # Set up project directory
   if [ -n "$repo_url" ]; then
     echo "Cloning $repo_url into $project_dir..."
-    git clone "$repo_url" "$project_dir"
+    # Authenticate the clone with a repo-scoped App token when possible: the host
+    # PAT can't see repos reachable only via the GitHub App. Fall back to the
+    # ambient git credentials (public repos / repos the host PAT can see).
+    local clone_token
+    clone_token=$(sudo mint-github-token --print-token "$(basename "${repo_url%.git}")" 2>/dev/null || true)
+    if [ -n "$clone_token" ]; then
+      GH_TOKEN="$clone_token" git clone "$repo_url" "$project_dir"
+    else
+      git clone "$repo_url" "$project_dir"
+    fi
   else
     mkdir -p "$project_dir"
     git -C "$project_dir" init -q
@@ -153,6 +164,12 @@ FLAGS
   echo "Starting container '$name'..."
   sudo nixos-container start "$name"
 
+  # Mint the first GitHub token now (blocks until written); the host's
+  # github-token.timer keeps it refreshed. Skips cleanly for an empty container
+  # with no origin remote yet.
+  echo "Provisioning GitHub token..."
+  sudo mint-github-token "$name" || true
+
   echo ""
   echo "Container '$name' is ready."
   echo "  Shell:    devenv shell $name"
@@ -190,6 +207,9 @@ cmd_rebuild() {
   sudo nixos-container update "$name"
   git -C "$project_dir" reset HEAD .devenv 2>/dev/null || true
   _write_nspawn_flags "$name" "$project_dir" replace
+  # Re-mint now: picks up a repo whose origin remote was added after `devenv new`
+  # created an empty container.
+  sudo mint-github-token "$name" || true
   if [[ $restart -eq 1 ]]; then
     echo "Restarting container '$name'..."
     sudo nixos-container stop "$name"

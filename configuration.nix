@@ -17,6 +17,20 @@ let
   claudeWrapper = pkgs.writeShellScriptBin "claude" ''
     exec ${claudeCodePkg}/bin/claude --dangerously-skip-permissions "$@"
   '';
+  # Mints per-container, repo-scoped 1h GitHub App tokens. Run as root by the
+  # github-token systemd service/timer; the App private key never enters a container.
+  mintGithubToken = pkgs.writeShellApplication {
+    name = "mint-github-token";
+    runtimeInputs = with pkgs; [
+      openssl
+      curl
+      jq
+      git
+      coreutils
+      systemd
+    ];
+    text = builtins.readFile ./devenvs/mint-github-token.sh;
+  };
   ensureRepo = owner: repo: dest: postClone: ''
     if [ ! -d ${dest}/.git ]; then
       mkdir -p $(dirname ${dest})
@@ -41,6 +55,11 @@ in
   sops.secrets.github_pat.owner = "claw";
   sops.secrets.tailscale_auth_key = { };
   sops.secrets.tailscale_devenv_auth_key = { };
+  # GitHub App credentials for minting per-container tokens. Root-only (0400);
+  # never bind-mounted into a container. Add the values with:
+  #   sops secrets.yaml   ->  gh_app_id, gh_app_private_key (the App's .pem)
+  sops.secrets.gh_app_id = { };
+  sops.secrets.gh_app_private_key = { };
 
   system.activationScripts.ensure-nixos-repo = ensureRepo "Clueed" "oci-claw" "/home/claw/nixos" "";
   system.activationScripts.ensure-nanoclaw-repo =
@@ -86,10 +105,38 @@ in
   networking.nat.internalInterfaces = [ "ve-+" ];
   boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
+  # Per-container GitHub token provisioning. github-token.service mints a 1h
+  # installation token scoped to each running container's repo and writes it into
+  # that container's /etc/secrets/github_token. The App private key stays on the
+  # host; only the disposable token enters a container. The timer refreshes every
+  # running container; devenv.sh mints on demand at create/rebuild via the
+  # mint-github-token command on PATH (no per-container systemd units, since
+  # /etc/systemd/system is read-only on NixOS).
+  systemd.services.github-token = {
+    description = "Mint GitHub App tokens for running dev containers";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${mintGithubToken}/bin/mint-github-token";
+    };
+  };
+  systemd.timers.github-token = {
+    description = "Refresh GitHub App tokens for dev containers";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      # Re-mint shortly after a host reboot (tokens expired while off) and then
+      # every 45 min, comfortably inside the token's 1h lifetime.
+      OnBootSec = "2min";
+      OnUnitActiveSec = "45min";
+    };
+  };
+
   environment.systemPackages = [
     opencodePkg
     claudeWrapper
     agentBrowserPkg
+    mintGithubToken
     pkgs.gh
     pkgs.git
     pkgs.sops

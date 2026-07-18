@@ -19,6 +19,13 @@ let
     exec ${claudeCodePkg}/bin/claude --dangerously-skip-permissions "$@"
   '';
   agentBrowser = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.agent-browser;
+  # gh wrapper that reads the current short-lived token from disk on every call,
+  # so hourly token rotation is transparent to long-lived processes (opencode-web).
+  # The git credential helper (`gh auth git-credential`) resolves to this wrapper too.
+  ghWrapper = pkgs.writeShellScriptBin "gh" ''
+    export GH_TOKEN=$(cat /etc/secrets/github_token 2>/dev/null || true)
+    exec ${pkgs.gh}/bin/gh "$@"
+  '';
   # Global agent instructions, shared by OpenCode (AGENTS.md) and Claude Code (CLAUDE.md).
   agentInstructions = ''
     A native browser automation CLI (`agent-browser`) is available for controlling a browser — useful for testing, QA, and web scraping.
@@ -125,7 +132,7 @@ in
   environment.systemPackages = with pkgs; [
     bash
     git
-    gh
+    ghWrapper
     curl
     jq
     mosh
@@ -139,12 +146,11 @@ in
 
   environment.variables.OPENCODE_ENABLE_EXA = "1";
 
-  # Make GH_TOKEN available in login shells via the bind-mounted secret.
-  # NixOS's /etc/profile sources /etc/profile.local (not profile.d/).
-  # gh auth on the host uses GH_TOKEN (PAT), not the hosts.yml keyring entry.
-  environment.etc."profile.local".text = ''
-    export GH_TOKEN=$(cat /etc/secrets/github_pat 2>/dev/null || true)
-  '';
+  # GitHub auth is provided by a per-container, repo-scoped, 1h token written to
+  # /etc/secrets/github_token by the host's github-token service (see the
+  # host configuration.nix). The gh wrapper reads it fresh on every call, so it is
+  # deliberately NOT exported as GH_TOKEN into shells (a login-time snapshot would
+  # go stale within the hour for long-lived processes).
 
   # Required for home-manager to work in nixos-container.
   # /etc/secrets is created here so nspawn can bind-mount secrets into it at container start.
@@ -173,7 +179,7 @@ in
     ];
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
-    # credential helper uses GH_TOKEN set by gh-token.sh.
+    # credential helper runs the gh wrapper, which reads /etc/secrets/github_token.
     home.file.".config/opencode/AGENTS.md".text = agentInstructions;
     home.file.".claude/CLAUDE.md".text = agentInstructions;
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
