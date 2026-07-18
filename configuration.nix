@@ -100,6 +100,16 @@ in
 
   boot.enableContainers = true;
 
+  # systemd-nspawn force-mounts a tmpfs on each container's /tmp by default, sized to
+  # ~10% of host RAM (its built-in default, nothing we configured). Large builds,
+  # downloads, and VS Code server unpacks blow that small cap and get ENOSPC while the
+  # disk still has room. SYSTEMD_NSPAWN_TMPFS_TMP=0 disables that auto-mount so /tmp
+  # falls through to the container's disk-backed rootfs (/var/lib/nixos-containers/<name>).
+  # Set on the container@ template unit so every nixos-container inherits it; honored
+  # because container@.service execs systemd-nspawn directly (not via the machinectl
+  # wrapper, which ignores this env var — systemd#17863). Takes effect on container restart.
+  systemd.services."container@".environment.SYSTEMD_NSPAWN_TMPFS_TMP = "0";
+
   # Enable NAT and IP forwarding for devenv containers.
   # The ve-+ pattern covers all virtual ethernet interfaces created by nixos-container.
   networking.nat.enable = true;
