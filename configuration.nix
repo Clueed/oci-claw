@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  hostName,
   opencode,
   claude-code-nix,
   llm-agents,
@@ -103,7 +104,6 @@ in
   # The ve-+ pattern covers all virtual ethernet interfaces created by nixos-container.
   networking.nat.enable = true;
   networking.nat.internalInterfaces = [ "ve-+" ];
-  boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
   # Per-container GitHub token provisioning. github-token.service mints a 1h
   # installation token scoped to each running container's repo and writes it into
@@ -175,11 +175,9 @@ in
     flake = "/home/claw/nixos";
   };
 
-  services.logrotate.checkConfig = false;
-
   boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
-  networking.hostName = "ociclaw-1";
+  networking.hostName = hostName;
   networking.firewall.allowedTCPPorts = [
     22
     51413
