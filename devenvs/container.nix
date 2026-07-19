@@ -106,6 +106,18 @@ in
     ];
   };
 
+  # Lower the userspace/netstack MTU so the container's outbound TCP segments stay small
+  # enough to survive a DERP-relayed tailnet path. Background: OpenSSH 10.0+ (pulled in via
+  # a 2026-07 nixpkgs bump) defaults its key exchange to the post-quantum mlkem768x25519,
+  # whose KEX reply is a ~1.2 KB packet -- far larger than the old curve25519 reply. When a
+  # client reaches this container over a DERP relay (no direct path), that large packet hit a
+  # PMTU black hole and was silently dropped, so SSH hung at "expecting SSH2_MSG_KEX_ECDH_REPLY"
+  # and timed out. Small packets (ping, port probe, KEXINIT) always got through. In netstack
+  # mode there is no tailscale0 device to `ip link set mtu` on; TS_DEBUG_MTU is the only knob.
+  # 1000 leaves generous headroom under the relay path MTU; also protects large HTTP responses
+  # (e.g. the tailnet-served stash UI) from the same black hole. Raise if throughput matters.
+  systemd.services.tailscaled.environment.TS_DEBUG_MTU = "1000";
+
   # The tailscaled-autoconnect service is Type=notify by default, meaning multi-user.target
   # waits for it to send READY (which only happens when Tailscale reaches Running state).
   # In nspawn containers the ve-* veth interface isn't up until AFTER the container sends its
