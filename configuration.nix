@@ -303,6 +303,20 @@ in
         "$schema" = "https://opencode.ai/config.json";
         autoupdate = false;
         permission = "allow";
+        provider = {
+          openrouter = {
+            models = {
+              "deepseek/deepseek-v4-flash" = {
+                options = {
+                  provider = {
+                    ignore = [ "alibaba" ];
+                    allow_fallbacks = true;
+                  };
+                };
+              };
+            };
+          };
+        };
       };
 
       systemd.user.services.opencode-web = {
