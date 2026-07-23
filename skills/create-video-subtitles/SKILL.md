@@ -9,6 +9,23 @@ Transcribes video files into SRT subtitle files using Groq's Whisper API.
 
 > `<skill-path>` below refers to this skill's absolute directory path (where this SKILL.md lives).
 
+## Resolving the input
+
+The user may give you a file path directly, or they may give you the name of a
+**scene** in the Stash library (e.g. "Daniele Orth") instead of a path.
+
+- If the input already looks like an existing file path, use it as-is.
+- Otherwise, treat it as a search term and look it up via the Stash API
+  (`http://localhost:9999/graphql`, see the **stash** skill) to find the file:
+
+  ```bash
+  curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json" \
+    -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title files { path } } } }"}'
+  ```
+
+  Use the returned `files[].path` as the video path for transcription. If
+  multiple scenes match, ask the user which one they mean before proceeding.
+
 ## Usage
 
 ```bash
