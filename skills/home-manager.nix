@@ -7,6 +7,7 @@
     "devenv"
     "skill-creator"
     "download-video"
+    "create-video-subtitles"
     "agent-browser"
     "stash"
     "torrent-server"
