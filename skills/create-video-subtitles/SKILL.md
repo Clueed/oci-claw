@@ -3,7 +3,7 @@ name: create-video-subtitles
 description: Transcribe video files into SRT subtitle files using Groq's Whisper API. Extracts audio (16kHz mono MP3), sends to Groq for transcription and translation, saves SRT files in the detected language and English. Use when the user asks to transcribe a video or create subtitles.
 ---
 
-# Create Video Subtitles Skill
+# Video Subtitles
 
 Transcribes video files into SRT subtitle files using Groq's Whisper API.
 
@@ -42,10 +42,10 @@ The script reads the API key from `/run/secrets/nanoclaw_groq_api_key` automatic
 
 SRT files are placed in the same directory as the video file:
 
-| File | Contents |
-|------|----------|
+| File                | Contents                                         |
+| ------------------- | ------------------------------------------------ |
 | `Video Name.ll.srt` | Original language transcription (ISO 639-1 code) |
-| `Video Name.en.srt` | English translation |
+| `Video Name.en.srt` | English translation                              |
 
 ## How It Works
 
