@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -115,22 +116,26 @@ def get_duration(audio_path: str) -> float:
     return float(result.stdout.strip())
 
 
-def split_audio(audio_path: str, chunk_dir: str, chunk_duration: int) -> list:
+def split_audio(audio_path: str, chunk_dir: str, chunk_duration: int, duration: float) -> list:
+    # ffmpeg's segment muxer doesn't recompute the FLAC STREAMINFO total_samples
+    # per output file when segmenting straight to FLAC — chunks end up reporting
+    # the original full-file duration instead of their own. Encoding each chunk
+    # with its own -ss/-t ffmpeg invocation avoids the segment muxer (and its
+    # shared encoder session) entirely, so each STREAMINFO header is correct.
     base = os.path.splitext(os.path.basename(audio_path))[0]
-    pattern = os.path.join(chunk_dir, f"{base}_chunk_%03d.flac")
-
-    cmd = [
-        "ffmpeg", "-y", "-i", audio_path,
-        "-f", "segment", "-segment_time", str(chunk_duration),
-        "-c:a", "flac", pattern,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"ffmpeg split error: {result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    chunks = sorted(
-        [os.path.join(chunk_dir, f) for f in os.listdir(chunk_dir) if f.endswith(".flac")]
-    )
+    num_chunks = math.ceil(duration / chunk_duration)
+    chunks = []
+    for i in range(num_chunks):
+        chunk_path = os.path.join(chunk_dir, f"{base}_chunk_{i:03d}.flac")
+        cmd = [
+            "ffmpeg", "-y", "-ss", str(i * chunk_duration), "-t", str(chunk_duration),
+            "-i", audio_path, "-c:a", "flac", chunk_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"ffmpeg split error: {result.stderr}", file=sys.stderr)
+            sys.exit(1)
+        chunks.append(chunk_path)
     return chunks
 
 
@@ -173,7 +178,7 @@ def main():
             print(f"Splitting audio into {args.chunk_duration}s chunks...", file=sys.stderr)
             chunk_dir = os.path.join(tmpdir, "chunks")
             os.makedirs(chunk_dir, exist_ok=True)
-            raw_chunks = split_audio(audio_path, chunk_dir, args.chunk_duration)
+            raw_chunks = split_audio(audio_path, chunk_dir, args.chunk_duration, duration)
             chunks = []
             offsets = []
             for i, ch in enumerate(raw_chunks):
