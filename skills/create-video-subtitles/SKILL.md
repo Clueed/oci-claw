@@ -23,8 +23,12 @@ The user may give you a file path directly, or they may give you the name of a
     -d '{"query":"{ findScenes(filter: { q: \"SEARCH_TERM\" }) { scenes { id title files { path } } } }"}'
   ```
 
-  Use the returned `files[].path` as the video path for transcription. If
-  multiple scenes match, ask the user which one they mean before proceeding.
+  The returned `files[].path` is a path inside the Stash container's VM, not
+  directly on this host. Map it before using it: `/data/remote/...` ->
+  `/mnt/stash-data/remote/...` (see `containers/stash.nix`, where
+  `/mnt/stash-data` is bind-mounted into the stash containers at `/data`).
+  Use the mapped path as the video path for transcription. If multiple scenes
+  match, ask the user which one they mean before proceeding.
 
 ## Usage
 
