@@ -197,6 +197,15 @@ in
     home.file.".config/opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
       permission = "allow";
+      provider = {
+        openrouter = {
+          setCacheKey = true;
+          timeout = 300000;
+        };
+      };
+      extra_headers = {
+        "X-OpenRouter-Cache" = "true";
+      };
     };
     programs.git = {
       enable = true;

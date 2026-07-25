@@ -305,6 +305,8 @@ in
         permission = "allow";
         provider = {
           openrouter = {
+            setCacheKey = true;
+            timeout = 300000;
             models = {
               "deepseek/deepseek-v4-flash" = {
                 options = {
@@ -316,6 +318,9 @@ in
               };
             };
           };
+        };
+        extra_headers = {
+          "X-OpenRouter-Cache" = "true";
         };
       };
 
