@@ -201,10 +201,12 @@ in
         openrouter = {
           setCacheKey = true;
           timeout = 300000;
+          options = {
+            headers = {
+              "X-OpenRouter-Cache" = "true";
+            };
+          };
         };
-      };
-      extra_headers = {
-        "X-OpenRouter-Cache" = "true";
       };
     };
     programs.git = {

@@ -307,6 +307,11 @@ in
           openrouter = {
             setCacheKey = true;
             timeout = 300000;
+            options = {
+              headers = {
+                "X-OpenRouter-Cache" = "true";
+              };
+            };
             models = {
               "deepseek/deepseek-v4-flash" = {
                 options = {
@@ -318,9 +323,6 @@ in
               };
             };
           };
-        };
-        extra_headers = {
-          "X-OpenRouter-Cache" = "true";
         };
       };
 
