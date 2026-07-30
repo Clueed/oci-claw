@@ -74,6 +74,7 @@ let
         pkgs.bun
         pkgs.nodejs
         pkgs.pnpm
+        pkgs.procps           # pgrep/pkill for app scripts
       ];
       environment = srv.environment;
       serviceConfig = {
