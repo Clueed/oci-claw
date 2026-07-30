@@ -75,6 +75,11 @@ in
       peer-port-random-on-start = true;
       port-forwarding-enabled = false;
       encryption = 2;
+      watch-dir-enabled = true;
+      watch-dir = "/home/claw/projects/torrents";
+      watch-dir-force-generic = true;
+      trash-original-torrent-files = false;
+      start-added-torrents = false;
       "script-torrent-done-enabled" = true;
       "script-torrent-done-filename" = "${doneScript}";
     };
