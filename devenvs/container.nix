@@ -208,6 +208,11 @@ in
           };
         };
       };
+      agent = {
+        explore.disable = true;
+        scout.disable = true;
+        general.disable = true;
+      };
     };
     programs.git = {
       enable = true;
