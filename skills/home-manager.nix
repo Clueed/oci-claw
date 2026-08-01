@@ -11,5 +11,6 @@
     "agent-browser"
     "stash"
     "torrent-server"
+    "code-organization"
   ];
 }
