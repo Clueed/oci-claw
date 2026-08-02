@@ -42,6 +42,7 @@ let
 in
 {
   imports = [
+    ./options.nix
     ./hardware-configuration.nix
     ./containers/stash.nix
     ./containers/nanoclaw.nix
@@ -90,7 +91,7 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = pkgs.writeShellScript "tailscale-serve" ''
-        ${pkgs.tailscale}/bin/tailscale serve --service=svc:stash           --https=443 127.0.0.1:9999
+        ${pkgs.tailscale}/bin/tailscale serve --service=svc:stash           --https=443 127.0.0.1:${toString config.local.stash.port}
         ${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent-gallery --https=443 127.0.0.1:8766
         ${pkgs.tailscale}/bin/tailscale serve --service=svc:torrent         --https=443 127.0.0.1:9091
         ${pkgs.tailscale}/bin/tailscale serve --service=svc:opencode        --https=443 127.0.0.1:4096

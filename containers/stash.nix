@@ -6,6 +6,8 @@
 }:
 
 let
+  cfg = config.local.stash;
+
   rcloneMountScript = ''
     apk add --no-cache fuse
     fusermount -uz /data/remote || umount -l /data/remote || true
@@ -23,7 +25,7 @@ let
       --vfs-cache-poll-interval 1m \
       --dir-cache-time 5m \
       --rc \
-      --rc-addr :5572 \
+      --rc-addr :${toString cfg.vfsRcPort} \
       --rc-no-auth
   '';
 
@@ -143,7 +145,7 @@ in
       STASH_GENERATED = "/generated/";
       STASH_METADATA = "/metadata/";
       STASH_CACHE = "/cache/";
-      STASH_PORT = "9999";
+      STASH_PORT = toString cfg.port;
     };
     volumes = [
       "stash-config:/root/.stash"
@@ -154,10 +156,10 @@ in
       "stash-local:/data/local"
       "/mnt/stash-data:/data:slave"
     ];
-    ports = [ "127.0.0.1:9999:9999" ];
+    ports = [ "127.0.0.1:${toString cfg.port}:${toString cfg.port}" ];
     extraOptions = [
       "--security-opt=apparmor:unconfined"
-      "--health-cmd=wget -q --spider http://localhost:9999/"
+      "--health-cmd=wget -q --spider http://localhost:${toString cfg.port}/"
       "--health-interval=30s"
       "--health-timeout=10s"
       "--health-retries=3"
@@ -176,5 +178,5 @@ in
     requires = [ "podman-stash-config-sync.service" ];
   };
 
-  # Port 9999 is exposed via Tailscale Services (svc:stash)
+  # local.stash.port is exposed via Tailscale Services (svc:stash)
 }
