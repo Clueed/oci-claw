@@ -53,7 +53,6 @@ let
     }
 
     is_video() { matches_ext "$1" ${builtins.concatStringsSep " " videoExts}; }
-    is_image() { matches_ext "$1" ${builtins.concatStringsSep " " imageExts}; }
 
     rpc() {
       local sid
@@ -139,7 +138,9 @@ let
         "SB1-sub1:data/"
     }
 
-    should_upload() { is_video "$1" || is_image "$1"; }
+    # Videos only. Images from auto-imported torrents are previews, browsed
+    # locally through the image gallery -- they must not reach the stash dir.
+    should_upload() { is_video "$1"; }
 
     torrent_path="$TR_TORRENT_DIR/$TR_TORRENT_NAME"
 
