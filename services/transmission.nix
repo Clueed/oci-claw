@@ -1,7 +1,12 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 let
   watchDir = "/home/claw/projects/torrents";
   rpcUrl = "http://127.0.0.1:9091/transmission/rpc";
+
+  # Stash's GraphQL API, and the rclone rc of the VFS mount that backs stash's
+  # library (see containers/stash.nix). Both loopback-only, no auth.
+  stashUrl = config.local.stash.url;
+  vfsRcUrl = config.local.stash.vfsRcUrl;
 
   videoExts = [
     "mp4"
@@ -142,18 +147,58 @@ let
     # locally through the image gallery -- they must not reach the stash dir.
     should_upload() { is_video "$1"; }
 
+    log() { echo "torrent-done[''${TR_TORRENT_NAME:-?}]: $*"; }
+
     torrent_path="$TR_TORRENT_DIR/$TR_TORRENT_NAME"
+
+    uploaded=0
 
     if [ -f "$torrent_path" ]; then
       if should_upload "$torrent_path"; then
         upload_file "$torrent_path"
+        uploaded=1
       fi
     elif [ -d "$torrent_path" ]; then
-      find "$torrent_path" -type f | while IFS= read -r file; do
+      # Read from a process substitution, not a pipe: a pipeline would run the
+      # loop in a subshell and lose the uploaded flag.
+      while IFS= read -r file; do
         if should_upload "$file"; then
           upload_file "$file"
+          uploaded=1
         fi
-      done
+      done < <(find "$torrent_path" -type f)
+    fi
+
+    if [ "$uploaded" -eq 0 ]; then
+      log "nothing uploaded, no scan"
+      exit 0
+    fi
+
+    # rclone copied straight to the remote, so the VFS mount stash reads its
+    # library through still has the old directory listing cached
+    # (--dir-cache-time 5m). Drop it first or the scan finds nothing new.
+    # An empty body refreshes the root, which is where uploads land; passing
+    # dir="/" is rejected as a nonexistent path.
+    refresh=$(${pkgs.curl}/bin/curl -s -m 60 -X POST \
+      -H "Content-Type: application/json" \
+      --data '{}' \
+      ${vfsRcUrl}/vfs/refresh) || refresh=""
+
+    if [ "$(echo "$refresh" | ${pkgs.jq}/bin/jq -r '.result[""] // empty' 2>/dev/null)" != "OK" ]; then
+      log "warning: VFS refresh failed (''${refresh:-no response}), scan may miss the new file(s)"
+    fi
+
+    scan=$(${pkgs.curl}/bin/curl -s -m 60 -X POST \
+      -H "Content-Type: application/json" \
+      --data '{"query":"mutation { metadataScan(input: {}) }"}' \
+      ${stashUrl}) || scan=""
+
+    job=$(echo "$scan" | ${pkgs.jq}/bin/jq -r '.data.metadataScan // empty' 2>/dev/null || true)
+
+    if [ -n "$job" ]; then
+      log "uploaded, triggered stash scan (job $job)"
+    else
+      log "uploaded, but stash scan failed: ''${scan:-no response}"
     fi
   '';
 in

@@ -110,6 +110,10 @@ in
       "${config.sops.secrets.rclone_config.path}:/rclone-conf/rclone.conf:ro"
       "/mnt/stash-data:/data:shared"
     ];
+    # rclone's rc, on loopback. The transmission torrent-done hook calls
+    # vfs/refresh through it: it uploads straight to the remote, so this
+    # mount's directory cache has to be dropped before stash scans.
+    ports = [ "127.0.0.1:${toString cfg.vfsRcPort}:${toString cfg.vfsRcPort}" ];
     extraOptions = [
       "--cap-add=SYS_ADMIN"
       "--device=/dev/fuse:/dev/fuse:rwm"
