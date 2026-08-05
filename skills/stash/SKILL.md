@@ -13,6 +13,14 @@ Stash API runs at `http://localhost:9999/graphql`.
 
 **If a new file was just added to the library and needs cataloging** (e.g. handed off from the download-video skill after a download), read **[scene-ingest.md](./scene-ingest.md)** and follow it end-to-end.
 
+## Choosing a scraper
+
+**Never guess a scraper id, and never loop over many scrapers.** With ~750
+installed, guessing produces wrong metadata and gets the host IP blocked. Read
+**[scrapers.md](./scrapers.md)** and use `scrape-auto.ts`, which ranks the
+handful of scrapers that can actually match a scene and only trusts results
+whose identity is proven (source URL or fingerprint).
+
 ## Tag References
 
 For the tagging workflow (fuzzy match, alias rules, auto-apply via scripts), see [tags-matching.md](./tags-matching.md).
@@ -29,6 +37,8 @@ For matching/attaching performers to a scene during ingest, see [performers-matc
 
 Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://localhost:9999/graphql`):
 
+- `bun <skill-path>/scripts/scrape-auto.ts [--run] [--all] [--json] <scene-id>` — pick and run the right scrapers for a scene via a precision-ordered ladder (URL → fingerprint → filename regex → guesses). Without `--run` it only prints the plan. Also `--health` / `--unbench`. See [scrapers.md](./scrapers.md).
+- `bun <skill-path>/scripts/scraper-index.ts [--refresh|--show <id>]` — build/inspect the index of installed scrapers (URL patterns, fragment regexes, selectivity) used by `scrape-auto.ts`.
 - `bun <skill-path>/scripts/scrape-scene.ts <url> <scene-id> [--title-only]` — scrape a source URL via `scrapeSceneURL` and write scalar fields back; prints scraped tags/performers/studio.
 - `bun <skill-path>/scripts/match-tag.ts [--apply <scene-id>] <terms...>` — fuzzy-match terms against the tag DB; `--apply` auto-adds exact matches.
 - `bun <skill-path>/scripts/create-tag.ts <scene-id> <names...>` — add tags to a scene by name (fuzzy-matched, idempotent).
