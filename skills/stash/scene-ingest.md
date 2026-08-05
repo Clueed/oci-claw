@@ -26,8 +26,34 @@ curl -s -X POST http://localhost:9999/graphql -H "Content-Type: application/json
 
 ## Step 3: Scrape metadata & update the scene
 
-Whether a source URL can be scraped — and how much of it can be written back — is
-determined here, from the URL alone. Classify the URL against this table:
+**Start here regardless of whether you have a source URL:**
+
+```bash
+bun <skill-path>/scripts/scrape-auto.ts --run SCENE_ID
+```
+
+This walks the scraper ladder in [scrapers.md](./scrapers.md) — source URL
+first, then an oshash/phash lookup against the stash-boxes, then narrower
+fallbacks — and prints what each returned.
+
+- **`CONFIRMED`** — identity is proven. Re-run with `--apply` to write the
+  scalar fields; tags/performers/studio are printed for Steps 4–6 as usual.
+- **`UNCONFIRMED`** — a plausible but unproven match. Treat it as a *hint* for
+  Steps 4–6, never as truth. `--apply` deliberately refuses these.
+- **nothing** — fall through to the URL table below, then to filename tagging.
+
+This matters most for the `none` rows in the table: a gofile/MEGA link or a
+scene with no URL at all has no scraper, but its **fingerprint** is often still
+known to a stash-box. That path only exists because Step 1 scans with
+`scanGeneratePhashes: true` — so don't skip it.
+
+If it resolves the scene, Steps 4–6 still apply; the title casing rule below
+still applies too.
+
+### Scraping from a source URL
+
+If you do have a source URL and want to drive the scrape from it directly,
+classify the URL against this table:
 
 | Source                                      | Scrape support | How to scrape                           |
 | ------------------------------------------- | -------------- | --------------------------------------- |
@@ -54,8 +80,9 @@ For `title-only`, scrape and write just the title. PMVHaven 422s when
 bun <skill-path>/scripts/scrape-scene.ts --title-only "VIDEO_URL" SCENE_ID
 ```
 
-For `none`, there is no Stash scraper for the URL — skip straight to Step 4 and
-tag from the filename.
+For `none`, there is no Stash scraper for the URL. If the fingerprint lookup at
+the top of this step didn't resolve it either, skip to Step 4 and tag from the
+filename.
 
 ### Title casing
 
