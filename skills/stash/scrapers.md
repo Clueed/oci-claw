@@ -32,15 +32,25 @@ which the URL-classification route can't help with at all.
 | Tier | Method | Confidence | Why it sits here |
 |---|---|---|---|
 | 0 | `scrapeSceneURL` on the scene's own URL | **high** | The scene records where it came from. Stash resolves the scraper from the URL itself — you never name one. |
-| 1 | oshash/phash against configured stash-boxes | **high** | Identity by content hash. No filename guessing, no false positives. Four boxes are configured (stashdb, TPDB, FansDB, PMVStash). |
-| 2 | Fragment scrapers whose filename regex matches | medium | An ID derived from the filename. Real, but coincidences happen. |
+| 1 | oshash/phash against configured stash-boxes | **high** *(oshash)* / medium *(phash only)* | Identity by content hash — but only an exact **oshash** proves it. See below. Four boxes are configured (stashdb, TPDB, FansDB, PMVStash). |
+| 2 | Fragment scrapers whose filename regex matches | medium | An ID derived from the filename. Real, but coincidences happen. Capped at 8, most-selective first. |
 | 3 | Fragment scrapers whose name/domain matches path tokens | low | A guess, capped at `--max` (default 5). |
 | 4 | `sceneByName` title search on those same candidates | low | A guess, capped. |
 | 5 | `Filename` / `FileMetadata` | low | Offline, never fails, near-zero value. Last resort. |
 
-**Only tiers 0 and 1 end the search.** A tier 2–4 hit is reported as
+**Only a `high` result ends the search.** Everything else is reported as
 `UNCONFIRMED` and must be eyeballed before it's written back — that is the
 guard against the `S1` failure mode above.
+
+**Not every stash-box hit is proof.** Stash queries the box with *every*
+fingerprint it holds, phash included, and phash is perceptual: re-encodes,
+compilations and scenes sharing an intro do collide. So the hit is only
+upgraded to `high` when the remote scene's fingerprint list contains one of
+*our* oshashes — an exact hash of this exact file. A phash-only hit prints as
+`[medium] stashdb (phash)` and `--apply` refuses it, same as a filename guess.
+
+Any cap that trims the plan (tier 2's, or `--max`) prints a `note:` line naming
+what it dropped. A short plan is never silently a truncated one.
 
 ## The two gates that do the work
 
@@ -55,9 +65,21 @@ silently on a non-match and substitutes the raw filename. This is precisely how
 **Selectivity.** Matching the regex is necessary but not sufficient: many
 `queryURLReplace` entries are cleanup rules, not identifiers. `DMM` uses
 `\..+$` (strip the extension) and `Xhamster` uses `.*\.[^\.]+$` — both match
-every file that exists. The index scores each regex against a random sample of
-real library filenames and keeps only those that reject ≥70% of it. This is
-what cut the plan for scene 1233 from 21 filename candidates to 5.
+every file that exists. The index scores each regex against a sample of real
+library filenames and keeps only those that reject ≥70% of it. This is what cut
+the plan for scene 1233 from 21 filename candidates to 5.
+
+The sample is drawn with stash's seeded `random_<seed>` sort, so two rebuilds
+score the same regexes against the same files — otherwise a scraper sitting
+near the threshold flips in and out of tier 2 on every refresh.
+
+Those regexes are Go/RE2 and are re-compiled in JS to evaluate them, which is
+lossy: a leading `(?i)` is translated, but named groups (`(?P<id>…)`) and
+mid-pattern flags are not. `scraper-index.ts` prints how many regexes it
+couldn't compile — that number matters in both directions. A dropped *specific*
+regex costs a scraper its gate; a dropped *catch-all* makes a scraper look far
+more selective than it is, which is how `Xvideos` and `Xhamster` were passing
+as trusted filename gates before their `(?i)` catch-alls could be read.
 
 ## Failure memory
 
@@ -89,7 +111,21 @@ The scraper YAMLs live in a root-owned podman volume
 (`/var/lib/containers/storage/volumes/stash-config/_data/scrapers/community`),
 so enrichment shells out to `sudo -n cat`. Without sudo the index still builds
 from GraphQL alone — it just loses regex gating and selectivity, which
-degrades tier 2 rather than breaking it.
+degrades tier 2 rather than breaking it. A full rebuild takes ~1 minute, most
+of it sudo round-trips; it only happens on `--refresh` or after 7 days.
+
+## Tests
+
+The pure parts — YAML fragment parsing, regex compilation, selectivity, and
+the oshash gate that `--apply` depends on — are covered:
+
+```bash
+bun test <skill-path>/scripts/
+```
+
+Worth re-running after any upstream scraper-YAML reformat: `parseFragmentBlock`
+is a line parser, and when it misreads a rule the symptom isn't a crash, it's a
+scraper quietly gaining or losing its filename gate.
 
 ## Known-blocked sites
 

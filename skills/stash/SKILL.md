@@ -37,7 +37,7 @@ For matching/attaching performers to a scene during ingest, see [performers-matc
 
 Runnable helpers at `<skill-path>/scripts/` (all default to `STASH_URL=http://localhost:9999/graphql`):
 
-- `bun <skill-path>/scripts/scrape-auto.ts [--run] [--all] [--json] <scene-id>` — pick and run the right scrapers for a scene via a precision-ordered ladder (URL → fingerprint → filename regex → guesses). Without `--run` it only prints the plan. Also `--health` / `--unbench`. See [scrapers.md](./scrapers.md).
+- `bun <skill-path>/scripts/scrape-auto.ts [--run] [--apply] [--all] [--json] [--max N] <scene-id>` — pick and run the right scrapers for a scene via a precision-ordered ladder (URL → fingerprint → filename regex → guesses). Without `--run` it only prints the plan; `--apply` writes the scalar fields, but only for an identity-proven result. Also `--health` / `--unbench`. See [scrapers.md](./scrapers.md).
 - `bun <skill-path>/scripts/scraper-index.ts [--refresh|--show <id>]` — build/inspect the index of installed scrapers (URL patterns, fragment regexes, selectivity) used by `scrape-auto.ts`.
 - `bun <skill-path>/scripts/scrape-scene.ts <url> <scene-id> [--title-only]` — scrape a source URL via `scrapeSceneURL` and write scalar fields back; prints scraped tags/performers/studio.
 - `bun <skill-path>/scripts/match-tag.ts [--apply <scene-id>] <terms...>` — fuzzy-match terms against the tag DB; `--apply` auto-adds exact matches.

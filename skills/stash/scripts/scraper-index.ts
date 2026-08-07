@@ -63,6 +63,13 @@ export interface FragmentQuery {
    * from a catch-all (~0.0), so only real gates are trusted.
    */
   selectivity?: number;
+  /**
+   * How many of `regexes` JS could not compile (RE2-only syntax). Those are
+   * dropped from both the gate and the selectivity score, so a scraper with
+   * every regex uncompilable silently loses tier 2 — count it rather than
+   * pretend it was evaluated.
+   */
+  uncompilable?: number;
 }
 
 export interface ScraperEntry {
@@ -81,21 +88,30 @@ export interface ScraperEntry {
 export interface ScraperIndex {
   builtAt: string;
   enriched: boolean;
+  /** Regexes JS couldn't compile, and how many scrapers they cost us. */
+  regexFailures?: { scrapers: number; regexes: number };
   scrapers: ScraperEntry[];
 }
 
-async function gql<T>(query: string): Promise<T> {
+async function gqlRaw<T>(query: string): Promise<T> {
   const res = await fetch(STASH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
   });
   const json: any = await res.json();
-  if (json.errors) {
-    for (const e of json.errors) console.error("GraphQL error:", e.message);
+  if (json.errors) throw new Error(json.errors.map((e: any) => e.message).join("; "));
+  return json.data as T;
+}
+
+/** As gqlRaw, but a failed query is fatal — used where there's no fallback. */
+async function gql<T>(query: string): Promise<T> {
+  try {
+    return await gqlRaw<T>(query);
+  } catch (e: any) {
+    console.error("GraphQL error:", e.message ?? e);
     process.exit(1);
   }
-  return json.data as T;
 }
 
 /** Read a root-owned file, falling back to non-interactive sudo. */
@@ -171,9 +187,44 @@ export function parseFragmentBlock(yaml: string): FragmentQuery | undefined {
   return { placeholder, regexes, action };
 }
 
+/**
+ * Compile a scraper YAML regex (Go/RE2) into a JS RegExp, or null if JS can't
+ * parse it.
+ *
+ * Go allows inline flag groups — `(?i)abp-\d+` — which JS rejects outright.
+ * That syntax is common in these YAMLs, so compiling naively drops those
+ * scrapers out of tier 2 with no signal at all. Leading flags are translated
+ * to real RegExp flags; anything else RE2-only returns null so callers can
+ * count it instead of silently treating it as "doesn't match".
+ */
+export function compileGoRegex(source: string): RegExp | null {
+  let body = source;
+  let flags = "";
+  const inline = body.match(/^\(\?([ims]+)\)/);
+  if (inline) {
+    body = body.slice(inline[0].length);
+    for (const f of "ims") if (inline[1].includes(f)) flags += f;
+  }
+  try {
+    return new RegExp(body, flags);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Take the scalar value off a `regex:` line.
+ *
+ * Trailing YAML comments are common here and must not end up inside the
+ * pattern — `regex: '^(...)#?(\d+)' # site name - code` previously compiled to
+ * nothing at all, quietly costing that scraper its filename gate. A `#` only
+ * starts a comment outside quotes and after whitespace, which is what keeps
+ * `(?:#)?` inside the pattern intact.
+ */
 function unquote(s: string): string {
-  const m = s.match(/^'(.*)'$/) || s.match(/^"(.*)"$/);
-  return m ? m[1] : s;
+  const quoted = s.match(/^'((?:[^']|'')*)'/) || s.match(/^"([^"]*)"/);
+  if (quoted) return quoted[1].replace(/''/g, "'");
+  return s.replace(/\s+#.*$/, "").trim();
 }
 
 function hostOf(urlPattern: string): string {
@@ -186,7 +237,10 @@ export function tokenize(s: string): string[] {
     .toLowerCase()
     .replace(/\.(com|net|org|tv|xxx|cc|co|io)\b/g, " ")
     .split(/[^a-z0-9]+/)
-    // camelCase / digit boundaries: "BangBros" -> bang, bros
+    // Letter->digit boundaries: "Brazzers2" -> brazzers, 2. Note this runs
+    // after lowercasing, so camelCase is already gone ("BangBros" stays one
+    // token) — fine for affinity, which compares tokenized ids to tokenized
+    // paths, but don't expect it to split words.
     .flatMap(w => w.replace(/([a-z])([0-9])/g, "$1 $2").split(" "))
     .filter(w => w.length >= 3);
 }
@@ -203,11 +257,19 @@ const CONTROL_FILENAMES = [
   "TPDB-Example-Scene-Name.mp4", "021523-001-carib.mp4", "video.mp4",
 ];
 
+/**
+ * Fixed seed for the filename sample. Stash's `random_<seed>` sort is stable,
+ * so two rebuilds score the same regexes against the same files — otherwise a
+ * scraper sitting near MIN_SELECTIVITY flips in and out of tier 2 on every
+ * refresh, which is impossible to reason about.
+ */
+const SAMPLE_SEED = 20260101;
+
 /** Sample real filenames from the library so selectivity reflects this library. */
 async function sampleBasenames(limit = 300): Promise<string[]> {
   try {
-    const data = await gql<{ findScenes: { scenes: { files: { basename: string }[] }[] } }>(
-      `{ findScenes(filter:{per_page:${limit}, sort:"random"}) { scenes { files { basename } } } }`,
+    const data = await gqlRaw<{ findScenes: { scenes: { files: { basename: string }[] }[] } }>(
+      `{ findScenes(filter:{per_page:${limit}, sort:"random_${SAMPLE_SEED}"}) { scenes { files { basename } } } }`,
     );
     const names = data.findScenes.scenes.flatMap(s => s.files.map(f => f.basename)).filter(Boolean);
     return names.length >= 20 ? names : CONTROL_FILENAMES;
@@ -217,10 +279,8 @@ async function sampleBasenames(limit = 300): Promise<string[]> {
 }
 
 /** Fraction of the sample the regexes do NOT match; 1.0 = maximally specific. */
-function computeSelectivity(regexes: string[], sample: string[]): number {
-  const compiled = regexes.map(r => { try { return new RegExp(r); } catch { return null; } })
-    .filter((r): r is RegExp => r !== null);
-  if (!compiled.length) return 0;
+export function computeSelectivity(compiled: RegExp[], sample: string[]): number {
+  if (!compiled.length || !sample.length) return 0;
   const hits = sample.filter(n => compiled.some(r => r.test(n))).length;
   return 1 - hits / sample.length;
 }
@@ -246,6 +306,8 @@ export async function buildIndex(): Promise<ScraperIndex> {
   const enriched = ymlByStem.size > 0;
   const sample = enriched ? await sampleBasenames() : [];
 
+  const regexFailures = { scrapers: 0, regexes: 0 };
+
   const scrapers: ScraperEntry[] = listScrapers.map(s => {
     const urls = s.scene?.urls ?? [];
     const hosts = [...new Set(urls.map(hostOf))];
@@ -263,14 +325,24 @@ export async function buildIndex(): Promise<ScraperIndex> {
       if (yaml) {
         entry.fragment = parseFragmentBlock(yaml);
         if (entry.fragment?.placeholder === "filename" && entry.fragment.regexes.length) {
-          entry.fragment.selectivity = computeSelectivity(entry.fragment.regexes, sample);
+          const compiled = entry.fragment.regexes.map(compileGoRegex);
+          const failed = compiled.filter(r => r === null).length;
+          if (failed) {
+            entry.fragment.uncompilable = failed;
+            regexFailures.regexes += failed;
+            regexFailures.scrapers += 1;
+          }
+          entry.fragment.selectivity = computeSelectivity(
+            compiled.filter((r): r is RegExp => r !== null),
+            sample,
+          );
         }
       }
     }
     return entry;
   });
 
-  return { builtAt: new Date().toISOString(), enriched, scrapers };
+  return { builtAt: new Date().toISOString(), enriched, regexFailures, scrapers };
 }
 
 export function loadIndex(): ScraperIndex | null {
@@ -332,6 +404,11 @@ async function main() {
   console.log(`hosts        ${new Set(idx.scrapers.flatMap(s => s.hosts)).size}`);
   if (idx.enriched) {
     console.log(`filename-gateable fragment scrapers: ${gateable.length}`);
+    const rf = idx.regexFailures;
+    if (rf?.regexes) {
+      console.log(`  ${rf.regexes} regex(es) in ${rf.scrapers} scraper(s) don't compile in JS`);
+      console.log(`  (RE2-only syntax — those regexes can't gate, see --show <id>)`);
+    }
   } else {
     console.log(`NOT enriched — scraper YAMLs unreadable (need sudo); regex gating disabled`);
   }

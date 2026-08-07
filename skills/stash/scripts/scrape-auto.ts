@@ -9,7 +9,8 @@
  * tiered ladder and stops at the first result worth keeping:
  *
  *   0 URL        scene already has a source URL -> stash resolves the scraper
- *   1 STASHBOX   oshash/phash lookup against configured stash-boxes
+ *   1 STASHBOX   oshash/phash lookup against configured stash-boxes (only an
+ *                exact oshash counts as proof; phash is perceptual)
  *   2 FILENAME   fragment scrapers whose filename regex actually matches
  *   3 AFFINITY   fragment scrapers whose name/domain matches path tokens
  *   4 NAME       title search, restricted to affinity candidates
@@ -34,10 +35,10 @@
  *   STASH_HEALTH_PATH   default: ~/.cache/stash-skill/scraper-health.json
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { homedir } from "os";
-import { getIndex, tokenize, type ScraperEntry } from "./scraper-index.ts";
+import { compileGoRegex, getIndex, tokenize, type ScraperEntry } from "./scraper-index.ts";
 
 const STASH = process.env.STASH_URL || "http://localhost:9999/graphql";
 const HEALTH_PATH = process.env.STASH_HEALTH_PATH
@@ -49,6 +50,13 @@ const FAIL_THRESHOLD = 3;
 const BENCH_MS = 24 * 60 * 60 * 1000;
 /** Default cap on guessed (tier 3/4) scrapers to try. */
 const DEFAULT_MAX_GUESSES = 5;
+/**
+ * Cap on tier 2, ordered most-selective first. Selectivity usually keeps this
+ * list short, but nothing guarantees it — an unlucky filename could otherwise
+ * fan out across dozens of live sites, which is the behaviour this script
+ * exists to prevent. Truncation is always reported, never silent.
+ */
+const MAX_FILENAME_CANDIDATES = 8;
 /**
  * A filename regex must reject at least this fraction of the library to count
  * as identifying evidence. Catch-all cleanup regexes score ~0 and are ignored.
@@ -87,6 +95,8 @@ interface Scraped {
   studio?: { name?: string | null } | null;
   performers?: { name?: string | null }[] | null;
   tags?: { name?: string | null }[] | null;
+  /** Stash-box sources return the remote scene's fingerprints; scrapers don't. */
+  fingerprints?: { algorithm?: string | null; hash?: string | null }[] | null;
 }
 
 type Confidence = "high" | "medium" | "low";
@@ -94,13 +104,17 @@ type Confidence = "high" | "medium" | "low";
 /**
  * How much a tier's answer can be trusted without human review.
  *
- * high   — identity is proven: the scene's own URL, or a fingerprint hash.
- * medium — an ID was derived from the filename by regex. Loose patterns do
- *          produce confident-looking nonsense (a `1045` in the filename will
- *          happily match an unrelated catalogue number), so these must be
- *          confirmed before being written back.
+ * high   — identity is proven: the scene's own URL, or an exact oshash.
+ * medium — plausible but not proof. Either an ID derived from the filename by
+ *          regex (a `1045` in the filename will happily match an unrelated
+ *          catalogue number), or a stash-box hit that only matched on phash —
+ *          a *perceptual* hash, so re-encodes, compilations and shared intros
+ *          do collide. Must be eyeballed before being written back.
  * low    — pure guesswork from name/token similarity, or an offline echo of
  *          the filename.
+ *
+ * Tier 1 is resolved per result rather than from this table: see
+ * `stashBoxConfidence`.
  */
 const TIER_CONFIDENCE: Record<string, Confidence> = {
   "0-URL": "high",
@@ -110,6 +124,19 @@ const TIER_CONFIDENCE: Record<string, Confidence> = {
   "4-NAME": "low",
   "5-LOCAL": "low",
 };
+
+/**
+ * A stash-box match is only *proven* if the remote scene carries one of our
+ * own oshashes — a content hash of the exact file. Stash queries the box with
+ * every fingerprint it has, so a hit can equally well be a phash neighbour of
+ * a completely different scene; that gets `medium` and stays out of --apply.
+ */
+export function stashBoxConfidence(result: Scraped | undefined, oshashes: Set<string>): Confidence {
+  const matched = (result?.fingerprints ?? []).some(
+    f => f?.algorithm?.toLowerCase() === "oshash" && f.hash && oshashes.has(f.hash.toLowerCase()),
+  );
+  return matched ? "high" : "medium";
+}
 
 interface Attempt {
   tier: string;
@@ -199,11 +226,26 @@ function isUseful(s: Scraped | null | undefined): boolean {
   return scoreResult(s) >= 3;
 }
 
-const SCRAPE_FIELDS = `title date details image studio { name } performers { name } tags { name }`;
+const SCRAPE_FIELDS = `title date details image studio { name } performers { name } tags { name }
+  fingerprints { algorithm hash }`;
 
-async function scrapeBy(source: string, input: string): Promise<Scraped[]> {
+/** `ScraperSourceInput`: exactly one of these is set per candidate. */
+interface ScraperSource {
+  scraper_id?: string;
+  stash_box_endpoint?: string;
+}
+/** `ScrapeSingleSceneInput`. */
+interface ScrapeInput {
+  scene_id?: string;
+  query?: string;
+}
+
+async function scrapeBy(source: ScraperSource, input: ScrapeInput): Promise<Scraped[]> {
   const data = await gql<{ scrapeSingleScene: Scraped[] | null }>(
-    `query { scrapeSingleScene(source:{${source}}, input:{${input}}) { ${SCRAPE_FIELDS} } }`,
+    `query($source: ScraperSourceInput!, $input: ScrapeSingleSceneInput!) {
+       scrapeSingleScene(source: $source, input: $input) { ${SCRAPE_FIELDS} }
+     }`,
+    { source, input },
   );
   return data.scrapeSingleScene ?? [];
 }
@@ -224,13 +266,8 @@ function filenameGateMatches(entry: ScraperEntry, basename: string): boolean {
   const f = entry.fragment;
   if (!f || f.placeholder !== "filename" || !f.regexes.length) return false;
   if ((f.selectivity ?? 0) < MIN_SELECTIVITY) return false;
-  return f.regexes.some(rx => {
-    try {
-      return new RegExp(rx).test(basename);
-    } catch {
-      return false; // Go regex syntax we can't compile — don't guess
-    }
-  });
+  // Uncompilable regexes are counted at index time, not guessed at here.
+  return f.regexes.some(rx => compileGoRegex(rx)?.test(basename) ?? false);
 }
 
 function affinityScore(entry: ScraperEntry, sceneTokens: Set<string>): number {
@@ -242,14 +279,27 @@ function affinityScore(entry: ScraperEntry, sceneTokens: Set<string>): number {
   return score;
 }
 
-interface Candidate { tier: string; entry?: ScraperEntry; source: string; input: string; label: string }
+interface Candidate {
+  tier: string;
+  entry?: ScraperEntry;
+  /** Unset for tier 0, where scrapeSceneURL resolves the scraper itself. */
+  source?: ScraperSource;
+  input: ScrapeInput;
+  /** Tier 0 only: the source URL to scrape. */
+  url?: string;
+  label: string;
+}
 
-async function buildPlan(scene: Scene, maxGuesses: number): Promise<Candidate[]> {
+/** The plan, plus anything the caller must be told about how it was trimmed. */
+interface Plan { candidates: Candidate[]; notes: string[] }
+
+async function buildPlan(scene: Scene, maxGuesses: number): Promise<Plan> {
   const idx = await getIndex();
   const health = loadHealth();
   const file = scene.files[0];
   const basename = file?.basename ?? "";
   const plan: Candidate[] = [];
+  const notes: string[] = [];
   const used = new Set<string>();
 
   const add = (c: Candidate) => {
@@ -266,42 +316,52 @@ async function buildPlan(scene: Scene, maxGuesses: number): Promise<Candidate[]>
     plan.push({
       tier: "0-URL",
       entry: owner,
-      source: "", // scrapeSceneURL resolves the scraper itself
-      input: url,
+      url, // scrapeSceneURL resolves the scraper itself
+      input: {},
       label: owner ? `${owner.id} <- ${url}` : `auto <- ${url}`,
     });
   }
 
   // Tier 1 — fingerprints. No metadata guessing at all; either the hash is
-  // known to the box or it isn't.
-  const hasFingerprint = (file?.fingerprints ?? []).some(f => f.type === "phash" || f.type === "oshash");
-  if (hasFingerprint) {
-    const { configuration } = await gql<{ configuration: { general: { stashBoxes: { name: string }[] } } }>(
-      `{ configuration { general { stashBoxes { name } } } }`,
-    );
-    configuration.general.stashBoxes.forEach((box, i) => {
+  // known to the box or it isn't. Whether a hit counts as *proof* depends on
+  // which hash matched, and that's decided per result (stashBoxConfidence).
+  const fpTypes = new Set((file?.fingerprints ?? []).map(f => f.type));
+  if (fpTypes.has("oshash") || fpTypes.has("phash")) {
+    const { configuration } = await gql<{
+      configuration: { general: { stashBoxes: { name: string; endpoint: string }[] } };
+    }>(`{ configuration { general { stashBoxes { name endpoint } } } }`);
+    for (const box of configuration.general.stashBoxes) {
       plan.push({
         tier: "1-STASHBOX",
-        source: `stash_box_index:${i}`,
-        input: `scene_id:"${scene.id}"`,
+        source: { stash_box_endpoint: box.endpoint },
+        input: { scene_id: scene.id },
         label: box.name,
       });
-    });
+    }
   }
 
   // Tier 2 — fragment scrapers whose filename regex genuinely matches. This
-  // is the gate whose absence caused the 10Musume-JP 404 storm.
+  // is the gate whose absence caused the 10Musume-JP 404 storm. Most-selective
+  // first, so the cap drops the weakest evidence rather than an arbitrary tail.
   if (basename) {
-    for (const s of idx.scrapers) {
-      if (filenameGateMatches(s, basename)) {
-        add({
-          tier: "2-FILENAME",
-          entry: s,
-          source: `scraper_id:"${s.id}"`,
-          input: `scene_id:"${scene.id}"`,
-          label: s.id,
-        });
-      }
+    const matched = idx.scrapers
+      .filter(s => filenameGateMatches(s, basename))
+      .sort((a, b) => (b.fragment?.selectivity ?? 0) - (a.fragment?.selectivity ?? 0));
+    if (matched.length > MAX_FILENAME_CANDIDATES) {
+      const dropped = matched.slice(MAX_FILENAME_CANDIDATES).map(s => s.id);
+      notes.push(
+        `tier 2 capped at ${MAX_FILENAME_CANDIDATES} of ${matched.length} filename matches; `
+        + `dropped (least selective first): ${dropped.reverse().join(", ")}`,
+      );
+    }
+    for (const s of matched.slice(0, MAX_FILENAME_CANDIDATES)) {
+      add({
+        tier: "2-FILENAME",
+        entry: s,
+        source: { scraper_id: s.id },
+        input: { scene_id: scene.id },
+        label: s.id,
+      });
     }
   }
 
@@ -324,21 +384,20 @@ async function buildPlan(scene: Scene, maxGuesses: number): Promise<Candidate[]>
     add({
       tier: "3-AFFINITY",
       entry: s,
-      source: `scraper_id:"${s.id}"`,
-      input: `scene_id:"${scene.id}"`,
+      source: { scraper_id: s.id },
+      input: { scene_id: scene.id },
       label: s.id,
     });
   }
 
   if (scene.title) {
-    const q = scene.title.replace(/"/g, '\\"');
     for (const { s } of ranked.filter(x => x.s.supports.includes("NAME")).slice(0, maxGuesses)) {
       add({
         tier: "4-NAME",
         entry: s,
-        source: `scraper_id:"${s.id}"`,
-        input: `query:"${q}"`,
-        label: `${s.id} ?"${scene.title}"`,
+        source: { scraper_id: s.id },
+        input: { query: scene.title },
+        label: `${s.id} ?${JSON.stringify(scene.title)}`,
       });
     }
   }
@@ -346,34 +405,48 @@ async function buildPlan(scene: Scene, maxGuesses: number): Promise<Candidate[]>
   // Tier 5 — offline last resort, never fails, never hits the network.
   for (const id of ["Filename", "FileMetadata"]) {
     const s = idx.scrapers.find(x => x.id === id);
-    if (s) add({ tier: "5-LOCAL", entry: s, source: `scraper_id:"${s.id}"`, input: `scene_id:"${scene.id}"`, label: id });
+    if (s) {
+      add({
+        tier: "5-LOCAL",
+        entry: s,
+        source: { scraper_id: s.id },
+        input: { scene_id: scene.id },
+        label: id,
+      });
+    }
   }
 
-  return plan;
+  return { candidates: plan, notes };
 }
 
-async function runCandidate(c: Candidate): Promise<Attempt> {
-  const id = c.entry?.id ?? "auto";
+async function runCandidate(c: Candidate, oshashes: Set<string>): Promise<Attempt> {
+  const tierConfidence = TIER_CONFIDENCE[c.tier] ?? "low";
   try {
     let results: Scraped[];
     if (c.tier === "0-URL") {
       const data = await gql<{ scrapeSceneURL: Scraped | null }>(
         `query($url:String!){ scrapeSceneURL(url:$url){ ${SCRAPE_FIELDS} } }`,
-        { url: c.input },
+        { url: c.url },
       );
       results = data.scrapeSceneURL ? [data.scrapeSceneURL] : [];
     } else {
-      results = await scrapeBy(c.source, c.input);
+      results = await scrapeBy(c.source ?? {}, c.input);
     }
     const best = results.sort((a, b) => scoreResult(b) - scoreResult(a))[0];
+    const confidence = c.tier === "1-STASHBOX"
+      ? stashBoxConfidence(best, oshashes)
+      : tierConfidence;
+    const label = c.tier === "1-STASHBOX" && best
+      ? `${c.label} (${confidence === "high" ? "oshash" : "phash"})`
+      : c.label;
     return {
-      tier: c.tier, scraper: c.label, ok: !!best,
-      score: scoreResult(best), confidence: TIER_CONFIDENCE[c.tier] ?? "low", result: best,
+      tier: c.tier, scraper: label, ok: !!best,
+      score: scoreResult(best), confidence, result: best,
     };
   } catch (e: any) {
     return {
       tier: c.tier, scraper: c.label, ok: false, score: 0,
-      confidence: TIER_CONFIDENCE[c.tier] ?? "low", error: String(e.message ?? e),
+      confidence: tierConfidence, error: String(e.message ?? e),
     };
   }
 }
@@ -429,8 +502,14 @@ async function main() {
   const all = args.includes("--all");
   const asJson = args.includes("--json");
   const maxAt = args.indexOf("--max");
-  const maxGuesses = maxAt !== -1 ? Number(args[maxAt + 1]) : DEFAULT_MAX_GUESSES;
-  const positional = args.filter(a => !a.startsWith("--") && a !== String(maxGuesses));
+  const maxRaw = maxAt !== -1 ? Number(args[maxAt + 1]) : DEFAULT_MAX_GUESSES;
+  const maxGuesses = Number.isFinite(maxRaw) && maxRaw >= 0 ? maxRaw : DEFAULT_MAX_GUESSES;
+  if (maxAt !== -1 && maxGuesses !== maxRaw) {
+    console.error(`--max ${args[maxAt + 1] ?? ""}: not a number, using ${DEFAULT_MAX_GUESSES}`);
+  }
+  // Exclude --max's value by position: filtering by value would swallow a
+  // scene id that happens to equal the cap (`scrape-auto.ts 5`).
+  const positional = args.filter((a, i) => !a.startsWith("--") && (maxAt === -1 || i !== maxAt + 1));
 
   if (args.includes("--health")) {
     const h = loadHealth();
@@ -466,33 +545,40 @@ async function main() {
   }
 
   const { findScene } = await gql<{ findScene: Scene | null }>(
-    `query { findScene(id:"${sceneId}") {
+    `query($id: ID!) { findScene(id: $id) {
        id title urls studio { name }
        files { basename path fingerprints { type value } }
      } }`,
+    { id: sceneId },
   );
   if (!findScene) {
     console.error(`no scene ${sceneId}`);
     process.exit(1);
   }
 
-  const plan = await buildPlan(findScene, maxGuesses);
+  const { candidates: plan, notes } = await buildPlan(findScene, maxGuesses);
+  const oshashes = new Set(
+    (findScene.files[0]?.fingerprints ?? [])
+      .filter(f => f.type === "oshash")
+      .map(f => f.value.toLowerCase()),
+  );
 
   if (!run) {
     if (asJson) {
-      console.log(JSON.stringify({ scene: findScene, plan }, null, 2));
+      console.log(JSON.stringify({ scene: findScene, plan, notes }, null, 2));
       return;
     }
     console.log(`scene ${findScene.id}  ${findScene.files[0]?.basename ?? "(no file)"}`);
     console.log(`plan: ${plan.length} candidates (dry run — pass --run to execute)\n`);
     for (const c of plan) console.log(`  ${c.tier.padEnd(12)} ${c.label}`);
+    for (const n of notes) console.log(`\nnote: ${n}`);
     return;
   }
 
   const health = loadHealth();
   const attempts: Attempt[] = [];
   for (const c of plan) {
-    const a = await runCandidate(c);
+    const a = await runCandidate(c, oshashes);
     attempts.push(a);
 
     const id = c.entry?.id;
@@ -514,20 +600,21 @@ async function main() {
   const hits = attempts.filter(a => a.ok && isUseful(a.result)).sort((a, b) => b.score - a.score);
   const confirmed = hits.find(a => a.confidence === "high");
   if (asJson) {
-    console.log(JSON.stringify({ scene: findScene, attempts, confirmed, candidates: hits }, null, 2));
+    console.log(JSON.stringify({ scene: findScene, attempts, confirmed, candidates: hits, notes }, null, 2));
     return;
   }
 
   console.log("");
+  for (const n of notes) console.log(`note: ${n}`);
   if (confirmed) {
     console.log(`CONFIRMED  ${confirmed.scraper} (${confirmed.tier})`);
     console.log(`           ${summarize(confirmed.result!)}`);
     if (apply) await applyResult(findScene.id, confirmed.result!);
-    else console.log(`Identity is proven (source URL or fingerprint) — safe to apply.`);
+    else console.log(`Identity is proven (source URL or exact oshash) — safe to apply.`);
   } else if (hits.length) {
     console.log(`UNCONFIRMED — ${hits.length} candidate(s), none identity-proven:`);
     for (const h of hits) console.log(`  [${h.confidence}] ${h.scraper} (${h.tier})  ${summarize(h.result!)}`);
-    console.log(`\nA filename-derived match can be coincidental. Verify before applying.`);
+    console.log(`\nA filename-derived or phash-only match can be coincidental. Verify before applying.`);
     if (apply) console.log(`--apply refused: nothing here proves identity. Apply by hand if correct.`);
   } else {
     console.log(`no scraper returned usable metadata for scene ${findScene.id}`);
