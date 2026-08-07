@@ -5,10 +5,63 @@ import { mkdir, rename, stat, readdir, rmdir } from "fs/promises";
 import { existsSync, createWriteStream } from "fs";
 import { join, dirname, basename, extname } from "path";
 import { cwd } from "process";
+import vm from "vm";
+
+// GoFile rotates the X-Website-Token seed secret; a stale one makes every API
+// call fail with error-notPremium. Rather than hardcode it, load gofile.io's own
+// wt.obf.js and call its generateWT(). Falls back to the last known secret.
+const WT_SCRIPT_URL = "https://gofile.io/dist/js/wt.obf.js";
+const FALLBACK_TOKEN_SECRET = "9844d94d963d30";
+
+let wtGenerator: ((accountToken: string) => string) | null = null;
+let wtGeneratorLoaded = false;
+
+async function loadWtGenerator(userAgent: string): Promise<void> {
+  wtGeneratorLoaded = true;
+  try {
+    const res = await fetch(WT_SCRIPT_URL, {
+      headers: { "User-Agent": userAgent, Referer: "https://gofile.io/" },
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) return;
+    const src = await res.text();
+
+    // The script reads navigator.userAgent/language into the hash seed, so those
+    // must match the headers we actually send.
+    const sandbox: any = { console };
+    sandbox.window = sandbox;
+    sandbox.globalThis = sandbox;
+    sandbox.document = { cookie: "", addEventListener() {}, querySelector: () => null };
+    sandbox.navigator = { userAgent, language: "en-US", languages: ["en-US"] };
+    sandbox.localStorage = { getItem: () => null, setItem() {} };
+    sandbox.location = { href: "https://gofile.io/", hostname: "gofile.io" };
+    sandbox.setTimeout = setTimeout;
+    sandbox.setInterval = () => 0;
+
+    vm.createContext(sandbox);
+    vm.runInContext(src, sandbox, { timeout: 10000 });
+
+    if (typeof sandbox.generateWT === "function") {
+      const probe = sandbox.generateWT("");
+      if (typeof probe === "string" && /^[0-9a-f]{64}$/.test(probe)) {
+        wtGenerator = sandbox.generateWT;
+      }
+    }
+  } catch {
+    // fall through to the hardcoded secret
+  }
+}
 
 function generateWebsiteToken(userAgent: string, accountToken: string): string {
+  if (wtGenerator) {
+    try {
+      return wtGenerator(accountToken);
+    } catch {
+      // fall through
+    }
+  }
   const timeSlot = Math.floor(Date.now() / 1000 / 14400);
-  const raw = `${userAgent}::en-US::${accountToken}::${timeSlot}::5d4f7g8sd45fsd`;
+  const raw = `${userAgent}::en-US::${accountToken}::${timeSlot}::${FALLBACK_TOKEN_SECRET}`;
   return createHash("sha256").update(raw).digest("hex");
 }
 
@@ -97,7 +150,7 @@ class Downloader {
     });
 
     if (!jsonResponse || jsonResponse.status !== "ok") {
-      console.error(`API error for ${contentId}`);
+      console.error(`API error for ${contentId}: ${jsonResponse?.status ?? "no response"}`);
       return;
     }
 
@@ -298,6 +351,7 @@ class Manager {
       "Referer": "https://gofile.io/",
       "Accept-Encoding": "gzip",
     };
+    if (!wtGeneratorLoaded) await loadWtGenerator(this.session.headers["User-Agent"]);
     await this.setAccountAccessToken();
 
     const contentId = this.extractContentId();
@@ -366,6 +420,7 @@ class Manager {
     const authHeader = this.session.headers["Authorization"] || "";
     const accountToken = authHeader.replace("Bearer ", "");
     const wt = generateWebsiteToken(userAgent, accountToken);
+    let lastStatus: string | null = null;
 
     for (let i = 0; i < this.numberRetries; i++) {
       try {
@@ -379,11 +434,14 @@ class Manager {
         });
         const json = await res.json();
         if (json.status === "ok") return json;
-      } catch {
+        lastStatus = `${json.status} (HTTP ${res.status})`;
+        if (json.status === "error-rateLimit") await Bun.sleep(5000);
+      } catch (e) {
+        lastStatus = String(e);
         continue;
       }
     }
-    console.error(`API error for ${contentId}`);
+    console.error(`API error for ${contentId}: ${lastStatus ?? "unknown"}`);
     return null;
   }
 
