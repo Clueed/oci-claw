@@ -44,6 +44,7 @@ in
   imports = [
     ./options.nix
     ./hardware-configuration.nix
+    ./containers/blocky.nix
     ./containers/stash.nix
     ./containers/nanoclaw.nix
     ./aldi-talk-monitor/aldi-talk-monitor.nix
