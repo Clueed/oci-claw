@@ -62,16 +62,13 @@ let
   '';
 in
 {
-  # blocky is a service, not a dev container, so it gets its own key rather than
-  # borrowing tailscale_devenv_auth_key. Generate a reusable, non-ephemeral key
-  # tagged tag:claw in the admin console and add it with:
-  #   sops secrets.yaml   ->  tailscale_blocky_auth_key
-  # Non-ephemeral matters here: an ephemeral node is deleted when it goes offline,
-  # so the resolver's address would not survive a host reboot.
-  sops.secrets.tailscale_blocky_auth_key = { };
-
+  # Reuses the host's own tailscale_auth_key -- it is reusable and already
+  # carries tag:claw, so the node comes up tagged (and tagged nodes never
+  # expire, which is what keeps the resolver alive across key rotations).
+  # Deliberately NOT tailscale_devenv_auth_key: that key is tagged
+  # tag:claw-devenv, and blocky is a service, not a dev container.
   sops.templates."blocky-ts.env".content = ''
-    TS_AUTHKEY=${config.sops.placeholder.tailscale_blocky_auth_key}
+    TS_AUTHKEY=${config.sops.placeholder.tailscale_auth_key}
   '';
 
   virtualisation.oci-containers.containers.blocky-ts = {
@@ -84,11 +81,10 @@ in
       # DNS config would point blocky's own upstream lookups back at itself once
       # it is set as the tailnet nameserver.
       #
-      # No --advertise-tags: the auth key already carries tag:claw, and
-      # re-advertising a tag is rejected with "requested tags [...] are invalid
-      # or not permitted". devenvs/container.nix omits them for the same reason;
-      # the node still lands tagged, and tagged nodes never expire -- which is
-      # what keeps the resolver from dying on a key rotation.
+      # No --advertise-tags needed: the key already carries tag:claw, so the node
+      # lands tagged on its own. Advertising a tag the key does *not* carry is
+      # rejected outright ("requested tags [...] are invalid or not permitted"),
+      # which is what the devenv key would do here.
       TS_EXTRA_ARGS = "--accept-dns=false";
     };
     environmentFiles = [ config.sops.templates."blocky-ts.env".path ];
