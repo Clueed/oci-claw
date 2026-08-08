@@ -82,10 +82,22 @@ let
     dnssec:
       validate: true
 
+    # HaGeZi Pro++ ("Sweeper") replaces StevenBlack rather than joining it: it is
+    # a superset covering ads, affiliate, tracking, telemetry, phishing, malware,
+    # scam, fake and cryptojacking, so running both would only add a second place
+    # to hunt when something is wrongly blocked.
+    #
+    # The wildcard-asterisk file is the format HaGeZi documents for blocky 0.23+.
+    # Pro++ is their aggressive tier and is documented as possibly containing
+    # false positives, which is what the referral allowlist is for -- shopping
+    # and referral domains that Pro++ sweeps up and that break checkout flows.
     blocking:
       denylists:
         ads:
-          - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+          - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.plus.txt
+      allowlists:
+        ads:
+          - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/whitelist-referral-onlydomains.txt
       clientGroupsBlock:
         default:
           - ads
