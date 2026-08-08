@@ -62,11 +62,16 @@ let
   '';
 in
 {
-  # The sidecar's TS_AUTHKEY. Reuses the existing reusable devenv key so this
-  # needs no new secret; swap in a dedicated non-ephemeral key by adding
-  # `tailscale_blocky_auth_key` to secrets.yaml and pointing the placeholder at it.
+  # blocky is a service, not a dev container, so it gets its own key rather than
+  # borrowing tailscale_devenv_auth_key. Generate a reusable, non-ephemeral key
+  # tagged tag:claw in the admin console and add it with:
+  #   sops secrets.yaml   ->  tailscale_blocky_auth_key
+  # Non-ephemeral matters here: an ephemeral node is deleted when it goes offline,
+  # so the resolver's address would not survive a host reboot.
+  sops.secrets.tailscale_blocky_auth_key = { };
+
   sops.templates."blocky-ts.env".content = ''
-    TS_AUTHKEY=${config.sops.placeholder.tailscale_devenv_auth_key}
+    TS_AUTHKEY=${config.sops.placeholder.tailscale_blocky_auth_key}
   '';
 
   virtualisation.oci-containers.containers.blocky-ts = {
@@ -79,10 +84,11 @@ in
       # DNS config would point blocky's own upstream lookups back at itself once
       # it is set as the tailnet nameserver.
       #
-      # No --advertise-tags: the shared auth key already carries its tags, and
-      # re-advertising them is rejected with "requested tags [...] are invalid or
-      # not permitted". devenvs/container.nix omits them for the same reason; the
-      # node still lands as a tagged device.
+      # No --advertise-tags: the auth key already carries tag:claw, and
+      # re-advertising a tag is rejected with "requested tags [...] are invalid
+      # or not permitted". devenvs/container.nix omits them for the same reason;
+      # the node still lands tagged, and tagged nodes never expire -- which is
+      # what keeps the resolver from dying on a key rotation.
       TS_EXTRA_ARGS = "--accept-dns=false";
     };
     environmentFiles = [ config.sops.templates."blocky-ts.env".path ];
