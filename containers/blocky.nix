@@ -144,11 +144,16 @@ in
       # rejected outright ("requested tags [...] are invalid or not permitted"),
       # which is what the devenv key would do here.
       TS_EXTRA_ARGS = "--accept-dns=false";
+      # Kernel (TUN) mode. The image defaults to --tun=userspace-networking, and
+      # mounting /dev/net/tun is NOT enough to change that -- this variable is.
+      # Userspace/netstack does forward inbound UDP, so DNS works either way, but
+      # it terminates connections and re-originates them from localhost, so every
+      # client reaches blocky as 127.0.0.1. That collapses per-client blocking
+      # groups, clientLookup device names, and per-client query stats.
+      TS_USERSPACE = "false";
     };
     environmentFiles = [ config.sops.templates."blocky-ts.env".path ];
     extraOptions = [
-      # Kernel (TUN) mode rather than userspace networking: userspace only
-      # proxies TCP, which is the whole reason for this sidecar.
       "--device=/dev/net/tun:/dev/net/tun:rwm"
       # Drop podman's default capability set and add back only what tailscaled
       # needs to build the TUN interface and its netfilter rules.
