@@ -62,13 +62,15 @@ let
   '';
 in
 {
-  # Reuses the host's own tailscale_auth_key -- it is reusable and already
-  # carries tag:claw, so the node comes up tagged (and tagged nodes never
-  # expire, which is what keeps the resolver alive across key rotations).
-  # Deliberately NOT tailscale_devenv_auth_key: that key is tagged
-  # tag:claw-devenv, and blocky is a service, not a dev container.
+  # blocky's own key. Deliberately not tailscale_devenv_auth_key (tagged
+  # tag:claw-devenv -- blocky is a service, not a dev container) and not the
+  # host's tailscale_auth_key (single-use, already spent on the host's own join).
+  # The key is used exactly once, to register the node; after that the identity
+  # lives in the blocky-ts-state volume.
+  sops.secrets.tailscale_blocky_auth_key = { };
+
   sops.templates."blocky-ts.env".content = ''
-    TS_AUTHKEY=${config.sops.placeholder.tailscale_auth_key}
+    TS_AUTHKEY=${config.sops.placeholder.tailscale_blocky_auth_key}
   '';
 
   virtualisation.oci-containers.containers.blocky-ts = {
