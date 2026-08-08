@@ -78,7 +78,12 @@ in
       # --accept-dns=false: this node *is* the resolver. Accepting the tailnet's
       # DNS config would point blocky's own upstream lookups back at itself once
       # it is set as the tailnet nameserver.
-      TS_EXTRA_ARGS = "--advertise-tags=tag:claw --accept-dns=false";
+      #
+      # No --advertise-tags: the shared auth key already carries its tags, and
+      # re-advertising them is rejected with "requested tags [...] are invalid or
+      # not permitted". devenvs/container.nix omits them for the same reason; the
+      # node still lands as a tagged device.
+      TS_EXTRA_ARGS = "--accept-dns=false";
     };
     environmentFiles = [ config.sops.templates."blocky-ts.env".path ];
     extraOptions = [
@@ -104,7 +109,14 @@ in
       # Share the sidecar's netns: blocky binds 0.0.0.0 inside it, which is the
       # tailnet interface. No host port is published.
       "--network=container:blocky-ts"
-      # The image already ships a HEALTHCHECK (`/app/blocky healthcheck`).
+      # The image declares no HEALTHCHECK of its own (podman reports null), so
+      # without this a wedged resolver would still show as "Up". JSON-array form
+      # is required: a bare string is wrapped in CMD-SHELL, and this image is
+      # distroless -- no /bin/sh, so the probe would exit 1 with empty output.
+      ''--health-cmd=["/app/blocky","healthcheck"]''
+      "--health-interval=30s"
+      "--health-timeout=5s"
+      "--health-start-period=30s"
     ];
   };
 
