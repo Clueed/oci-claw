@@ -28,16 +28,59 @@ let
   tsHostname = "blocky";
   httpPort = 4000;
 
-  blockyConfig = pkgs.writeText "blocky.yml" ''
+  # Single source of truth for the version: both the runtime image and the
+  # validator below are pinned to it, so the binary checking the config is
+  # always the binary that will run it.
+  blockyVersion = "0.34.0";
+
+  # nixpkgs ships blocky 0.27.0, which predates the `dnssec` section and would
+  # reject this config outright, so build the matching version. 0.34 requires
+  # Go >= 1.26.2 while this nixpkgs defaults to 1.25.10, hence the override.
+  # Build-time only -- this never enters the system closure.
+  blockyPkg = (pkgs.buildGoModule.override { go = pkgs.go_1_26; }) (finalAttrs: {
+    pname = "blocky";
+    version = blockyVersion;
+    src = pkgs.fetchFromGitHub {
+      owner = "0xERR0R";
+      repo = "blocky";
+      rev = "v${finalAttrs.version}";
+      hash = "sha256-EgZId3EzfAUWsQo56Y5VGs2VJxj0tXiSuZNhd6/U/zc=";
+    };
+    doCheck = false;
+    vendorHash = "sha256-BeRM5X0cuxHCud23lgy+fL6PGAlY7XOmeKTiDeToAeQ=";
+    ldflags = [
+      "-s"
+      "-w"
+      "-X github.com/0xERR0R/blocky/util.Version=${finalAttrs.version}"
+    ];
+  });
+
+  blockyConfigFile = pkgs.writeText "blocky.yml" ''
+    # DNS-over-TLS upstreams: without this, every query leaves the box in
+    # cleartext on port 53, which rather defeats the point of running your own
+    # resolver. Hostnames (not bare IPs) are used so the TLS certificate can
+    # actually be verified against a name.
+    #
+    # That creates a chicken-and-egg problem -- resolving "one.one.one.one"
+    # needs DNS -- which bootstrapDns breaks by pinning the IPs. It also serves
+    # the blocklist downloads over HTTPS.
+    bootstrapDns:
+      - upstream: tcp-tls:one.one.one.one:853
+        ips:
+          - 1.1.1.1
+          - 1.0.0.1
+
     upstreams:
       groups:
         default:
-          - 1.1.1.1
-          - 9.9.9.9
+          - tcp-tls:one.one.one.one:853
+          - tcp-tls:dns.quad9.net:853
 
-    # Plain UDP/TCP upstreams above need no bootstrapDns; switch to DoH
-    # (https://...) only together with a bootstrapDns entry, or blocky cannot
-    # resolve its own upstream's hostname at startup.
+    # Validate the DNSSEC chain here rather than trusting the upstream to have
+    # done it. Off by default in blocky; the upstreams above validate too, so
+    # without this a SERVFAIL on a bogus domain proves nothing about blocky.
+    dnssec:
+      validate: true
 
     blocking:
       denylists:
@@ -60,6 +103,19 @@ let
     log:
       level: info
   '';
+
+  # Schema-driven validation at build time: a typo'd key or malformed YAML fails
+  # `nh os build` instead of crash-looping the container after activation.
+  # blocky exits 1 on an invalid config, which fails this derivation.
+  blockyConfig =
+    pkgs.runCommand "blocky.yml"
+      {
+        nativeBuildInputs = [ blockyPkg ];
+      }
+      ''
+        blocky validate -c ${blockyConfigFile}
+        cp ${blockyConfigFile} $out
+      '';
 in
 {
   # blocky's own key. Deliberately not tailscale_devenv_auth_key (tagged
@@ -94,8 +150,12 @@ in
       # Kernel (TUN) mode rather than userspace networking: userspace only
       # proxies TCP, which is the whole reason for this sidecar.
       "--device=/dev/net/tun:/dev/net/tun:rwm"
+      # Drop podman's default capability set and add back only what tailscaled
+      # needs to build the TUN interface and its netfilter rules.
+      "--cap-drop=ALL"
       "--cap-add=NET_ADMIN"
       "--cap-add=NET_RAW"
+      "--security-opt=no-new-privileges"
       # Resolve tailscale's own control plane without depending on blocky.
       "--dns=1.1.1.1"
       "--health-cmd=tailscale status --peers=false"
@@ -106,10 +166,16 @@ in
   };
 
   virtualisation.oci-containers.containers.blocky = {
-    image = "ghcr.io/0xerr0r/blocky:v0.34.0";
+    image = "ghcr.io/0xerr0r/blocky:v${blockyVersion}";
     volumes = [ "${blockyConfig}:/app/config.yml:ro" ];
     dependsOn = [ "blocky-ts" ];
     extraOptions = [
+      # Drop podman's whole default capability set. NET_BIND_SERVICE has to come
+      # back: the image runs as UID 100, so binding :53 fails with
+      # "listen tcp :53: bind: permission denied" without it (:4000 is fine).
+      "--cap-drop=ALL"
+      "--cap-add=NET_BIND_SERVICE"
+      "--security-opt=no-new-privileges"
       # Share the sidecar's netns: blocky binds 0.0.0.0 inside it, which is the
       # tailnet interface. No host port is published.
       "--network=container:blocky-ts"
