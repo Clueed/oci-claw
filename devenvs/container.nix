@@ -190,15 +190,21 @@ in
       "shadcn"
       "code-organization"
     ];
-    # Claude-only skills. The agent-skills bundle is a single set synced to every
-    # enabled target (OpenCode's ~/.agents/skills and Claude's ~/.claude/skills alike),
-    # so a skill meant for Claude alone is installed straight into ~/.claude/skills and
-    # excluded from the target sync — its rsync --delete would otherwise remove it.
+    # Per-agent skills. The agent-skills bundle is a single set synced to every enabled
+    # target (OpenCode's ~/.agents/skills and Claude's ~/.claude/skills alike), so a skill
+    # meant for one agent only is installed straight into that agent's dir and excluded
+    # from the target sync — its rsync --delete would otherwise remove it.
     programs.agent-skills.excludePatterns = [
       ".system"
       "merge-and-clean-up-pr"
+      "code-review"
+      "simplify"
     ];
+    # Claude only.
     home.file.".claude/skills/merge-and-clean-up-pr".source = ../skills/merge-and-clean-up-pr;
+    # OpenCode only.
+    home.file.".agents/skills/code-review".source = ../skills/code-review;
+    home.file.".agents/skills/simplify".source = ../skills/simplify;
     home.stateVersion = "25.11";
     # identity comes from the bind-mounted host ~/.gitconfig;
     # credential helper runs the gh wrapper, which reads /etc/secrets/github_token.
