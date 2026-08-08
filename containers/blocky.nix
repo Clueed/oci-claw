@@ -76,11 +76,23 @@ let
           - tcp-tls:one.one.one.one:853
           - tcp-tls:dns.quad9.net:853
 
-    # Validate the DNSSEC chain here rather than trusting the upstream to have
-    # done it. Off by default in blocky; the upstreams above validate too, so
-    # without this a SERVFAIL on a bogus domain proves nothing about blocky.
-    dnssec:
-      validate: true
+    # No `dnssec: validate: true` here, deliberately. It was enabled once and
+    # backed out: blocky 0.34's own validator produces false BOGUS verdicts. On
+    # an *insecure* (unsigned) delegation it logs "Unauthenticated NSEC/NSEC3 in
+    # DS response ... ignoring as DS denial", concludes the parent zone is
+    # secure, and then rejects the legitimately unsigned answer with "No RRSIG
+    # ... treating unsigned answer as bogus" -> SERVFAIL.
+    #
+    # Measured over ~1h of ordinary browsing: 133 warnings across 28 domains,
+    # including redgifs.com (and i./media./userpic.), willhaben.at,
+    # www.linkedin.com, graph.whatsapp.com and ocsp.sectigo.com -- OCSP, so it
+    # can break certificate checks, not just name resolution. The failures are
+    # intermittent, which surfaces as media that loads only some of the time.
+    #
+    # Nothing is lost by dropping it: both upstreams above (Cloudflare and
+    # Quad9) are validating resolvers, they are reached over authenticated TLS,
+    # and the link between blocky and them is the only hop this would have
+    # covered. Revisit if upstream fixes the DS-denial handling.
 
     # HaGeZi Pro++ ("Sweeper") replaces StevenBlack rather than joining it: it is
     # a superset covering ads, affiliate, tracking, telemetry, phishing, malware,
