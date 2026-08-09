@@ -110,6 +110,18 @@ let
       allowlists:
         ads:
           - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/whitelist-referral-onlydomains.txt
+          # Local false-positive fixes, on top of HaGeZi's referral allowlist.
+          # A multi-line string is an inline list rather than a URL.
+          - |
+            # willhaben is an Austrian classifieds site, so "ad" here means
+            # Anzeige (a listing), not advertising -- ad-search is the listing
+            # search backend, and Pro++ sweeps it up on the name alone. It is an
+            # authenticated app API (302 -> /auth), not an ad server, and with it
+            # blocked search in the willhaben iOS app fails.
+            #
+            # Deliberately not cltr.willhaben.at, which Pro++ also blocks: that
+            # one reads as a collector endpoint and blocking it costs nothing.
+            ad-search.willhaben.at
       clientGroupsBlock:
         default:
           - ads
