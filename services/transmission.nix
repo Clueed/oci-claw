@@ -8,6 +8,26 @@ let
   stashUrl = config.local.stash.url;
   vfsRcUrl = config.local.stash.vfsRcUrl;
 
+  # The metadataScan arguments the manual ingest pipeline uses (Step 1 of
+  # skills/stash/scene-ingest.md) -- an auto-imported torrent should land in
+  # exactly the same state as a hand-downloaded file, so keep the two in sync.
+  # A bare `input: {}` scans but generates nothing, leaving scenes without
+  # covers, preview video/sprites, or thumbnails. Phashes matter most: the
+  # scraper ladder identifies a scene by fingerprint when it has no source URL,
+  # which an auto-imported torrent never does.
+  #
+  # `/data/remote` is where the container mounts SB1-sub1:data, the same remote
+  # the done script uploads to. Backslashes escape the quotes for the JSON
+  # string this gets embedded in; Nix passes them through untouched.
+  scanInput = builtins.concatStringsSep ", " [
+    "paths: [\\\"/data/remote\\\"]"
+    "scanGenerateCovers: true"
+    "scanGeneratePreviews: true"
+    "scanGenerateSprites: true"
+    "scanGeneratePhashes: true"
+    "scanGenerateThumbnails: true"
+  ];
+
   videoExts = [
     "mp4"
     "mkv"
@@ -207,7 +227,7 @@ let
 
     scan=$(${pkgs.curl}/bin/curl -s -m 60 -X POST \
       -H "Content-Type: application/json" \
-      --data '{"query":"mutation { metadataScan(input: {}) }"}' \
+      --data '{"query":"mutation { metadataScan(input: {${scanInput}}) }"}' \
       ${stashUrl}) || scan=""
 
     job=$(echo "$scan" | ${pkgs.jq}/bin/jq -r '.data.metadataScan // empty' 2>/dev/null || true)
