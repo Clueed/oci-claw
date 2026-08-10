@@ -42,6 +42,10 @@ let
   # Applied to an already-lowercased string.
   imageRegex = "\\.(${builtins.concatStringsSep "|" imageExts})$";
 
+  # rclone filters restricting a directory copy to video files. Paired with
+  # --ignore-case so .MKV matches .mkv too.
+  videoFilters = builtins.concatStringsSep " " (map (e: "--include '*.${e}'") videoExts);
+
   # Shared shell prelude: ext matching + an unauthenticated RPC helper.
   # RPC needs no credentials (rpc-authentication-required = false) and is
   # bound to loopback only.
@@ -135,17 +139,12 @@ let
 
     ${common}
 
-    upload_file() {
-      local file="$1"
-      ${pkgs.rclone}/bin/rclone copy \
-        --config /run/secrets/rclone_config \
-        "$file" \
-        "SB1-sub1:data/"
-    }
+    # Root of stash's library on the remote (see containers/stash.nix).
+    remoteDir="SB1-sub1:data"
 
-    # Videos only. Images from auto-imported torrents are previews, browsed
-    # locally through the image gallery -- they must not reach the stash dir.
-    should_upload() { is_video "$1"; }
+    rc() {
+      ${pkgs.rclone}/bin/rclone --config /run/secrets/rclone_config "$@"
+    }
 
     log() { echo "torrent-done[''${TR_TORRENT_NAME:-?}]: $*"; }
 
@@ -153,20 +152,36 @@ let
 
     uploaded=0
 
+    # Videos only, in both branches. Images from auto-imported torrents are
+    # previews, browsed locally through the image gallery -- they must not
+    # reach the stash dir.
     if [ -f "$torrent_path" ]; then
-      if should_upload "$torrent_path"; then
-        upload_file "$torrent_path"
+      # Single-file torrent: there is no folder to preserve, so it lands
+      # directly in the library root.
+      if is_video "$torrent_path"; then
+        rc copy "$torrent_path" "$remoteDir/"
         uploaded=1
       fi
     elif [ -d "$torrent_path" ]; then
+      # Multi-file torrent: copy the torrent's own folder, keeping whatever
+      # nesting the videos sit in, instead of flattening them into the root.
+      # Count first so an all-images torrent skips the copy (and the scan)
+      # entirely; rclone's filters then do the actual selection.
+      #
       # Read from a process substitution, not a pipe: a pipeline would run the
-      # loop in a subshell and lose the uploaded flag.
+      # loop in a subshell and lose the counter.
       while IFS= read -r file; do
-        if should_upload "$file"; then
-          upload_file "$file"
-          uploaded=1
+        if is_video "$file"; then
+          uploaded=$((uploaded + 1))
         fi
       done < <(find "$torrent_path" -type f)
+
+      if [ "$uploaded" -gt 0 ]; then
+        # rclone creates no empty dirs, so image-only subfolders are not
+        # mirrored. Trailing basename keeps the folder itself on the remote.
+        rc copy --ignore-case ${videoFilters} \
+          "$torrent_path" "$remoteDir/$(basename "$torrent_path")"
+      fi
     fi
 
     if [ "$uploaded" -eq 0 ]; then
@@ -177,8 +192,10 @@ let
     # rclone copied straight to the remote, so the VFS mount stash reads its
     # library through still has the old directory listing cached
     # (--dir-cache-time 5m). Drop it first or the scan finds nothing new.
-    # An empty body refreshes the root, which is where uploads land; passing
-    # dir="/" is rejected as a nonexistent path.
+    # An empty body refreshes the root; passing dir="/" is rejected as a
+    # nonexistent path. Refreshing the root is enough even for a folder upload:
+    # the new directory shows up in the root listing, and it has no cached
+    # listing of its own yet, so stash's scan sees the files inside.
     refresh=$(${pkgs.curl}/bin/curl -s -m 60 -X POST \
       -H "Content-Type: application/json" \
       --data '{}' \
@@ -196,9 +213,9 @@ let
     job=$(echo "$scan" | ${pkgs.jq}/bin/jq -r '.data.metadataScan // empty' 2>/dev/null || true)
 
     if [ -n "$job" ]; then
-      log "uploaded, triggered stash scan (job $job)"
+      log "uploaded $uploaded video(s), triggered stash scan (job $job)"
     else
-      log "uploaded, but stash scan failed: ''${scan:-no response}"
+      log "uploaded $uploaded video(s), but stash scan failed: ''${scan:-no response}"
     fi
   '';
 in
