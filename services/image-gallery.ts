@@ -283,6 +283,15 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 #dl-info.none { color: #3a3a3a; }
 #dl-info.warn { color: #b8862c; }
 .file-entry .dl-dot { font-size: 9px; margin-left: 4px; color: #3a9a6a; }
+.file-entry.is-queued .dl-dot { color: #b8862c; }
+/* Downloaded previews stay listed but recede, so what is left to review stands out. */
+.file-entry.is-done { color: #4a5a52; }
+.file-entry.is-done:hover { color: #8aa; }
+.file-entry.filtered-out { display: none; }
+.folder .folder-dl { color: #3a9a6a; font-size: 9px; margin-left: 4px; }
+#filter-btn { background: none; border: 1px solid #2a2a2a; border-radius: 4px; color: #666; font-size: 11px; cursor: pointer; padding: 3px 8px; line-height: 1.4; }
+#filter-btn:hover { color: #ddd; border-color: #444; }
+#filter-btn.on { color: #3a9a6a; border-color: #2f5a48; }
 .folder.favorites-entry { color: #f0c040; }
 .folder.favorites-entry .folder-count { color: #886622; }
 .folder.favorites-entry.active { background: #3a3010; }
@@ -307,6 +316,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
     <button id="mode-btn" title="Toggle view mode (m)">⊞</button>
     <button id="dl-btn" title="Download the linked video (d)">⬇</button>
     <button id="dl-favs-btn" title="Download every favorited video (D)">⬇ favs</button>
+    <button id="filter-btn" title="Filter by download state (t)">all</button>
     <span id="img-name">—</span>
     <span id="dl-info"></span>
     <span id="img-counter"></span>
@@ -317,7 +327,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
   </div>
 </div>
 <script>
-let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false, scrollMode = false, links = {};
+let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false, scrollMode = false, links = {}, filterMode = 'all';
 const img = document.getElementById('current-img');
 const empty = document.getElementById('empty');
 const folderList = document.getElementById('folder-list');
@@ -331,6 +341,7 @@ const modeBtn = document.getElementById('mode-btn');
 const dlBtn = document.getElementById('dl-btn');
 const dlInfo = document.getElementById('dl-info');
 const dlFavsBtn = document.getElementById('dl-favs-btn');
+const filterBtn = document.getElementById('filter-btn');
 
 // Transmission being unreachable must not break browsing, so the link map
 // degrades to empty and the download controls simply stay disabled.
@@ -365,10 +376,11 @@ async function load() {
     el.className = 'folder';
     el.dataset.f = f;
     const hasFav = data[f].some(p => favorites.has(p));
-    el.innerHTML = '<span class="folder-name">' + f + '</span><span class="folder-count">' + data[f].length + '</span>' + (hasFav ? '<span class="has-fav">★</span>' : '');
+    el.innerHTML = '<span class="folder-name">' + f + '</span><span class="folder-count">' + data[f].length + '</span>' + '<span class="folder-dl"></span>' + (hasFav ? '<span class="has-fav">★</span>' : '');
     el.onclick = () => pick(f);
     folderList.appendChild(el);
   }
+  renderSidebarDownloads();
   const hash = location.hash.slice(1);
   if (hash) {
     const slash = hash.lastIndexOf('/');
@@ -395,6 +407,7 @@ function pick(f) {
   searchInput.value = '';
   document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === f));
   renderFileList();
+  ensureVisible();
   show();
 }
 
@@ -404,11 +417,25 @@ function pickFavs(startIdx) {
   searchInput.value = '';
   document.querySelectorAll('.folder').forEach(el => el.classList.toggle('active', el.dataset.f === '★ Favorites'));
   renderFileList();
+  ensureVisible();
   show();
 }
 
 function getFavImgs() {
   return Object.values(data).flat().filter(p => favorites.has(p)).sort();
+}
+
+// How many of a folder's previews point at a video that is already on disk.
+function folderStats(imgs) {
+  let done = 0, queued = 0, linked = 0;
+  for (const p of imgs) {
+    const l = links[p];
+    if (!l) continue;
+    linked++;
+    if (l.done) done++;
+    else if (l.wanted) queued++;
+  }
+  return { done, queued, linked, total: imgs.length };
 }
 
 function renderFileList() {
@@ -420,14 +447,18 @@ function renderFileList() {
     el.className = 'file-entry';
     el.dataset.i = String(i);
     el.textContent = name;
-    el.title = imgs[i];
     const l = links[imgs[i]];
+    el.title = l ? imgs[i] + '\\n→ ' + l.video + (l.done ? ' (downloaded)' : l.wanted ? ' (queued)' : '') : imgs[i];
     if (l && (l.wanted || l.done)) {
+      el.classList.add(l.done ? 'is-done' : 'is-queued');
       const dot = document.createElement('span');
       dot.className = 'dl-dot';
       dot.textContent = l.done ? '✓' : '⬇';
       el.appendChild(dot);
     }
+    // Hidden rather than removed, so entry positions keep matching image indices.
+    if (filterMode === 'new' && l && (l.done || l.wanted)) el.classList.add('filtered-out');
+    if (filterMode === 'done' && !(l && l.done)) el.classList.add('filtered-out');
     el.onclick = () => { idx = parseInt(el.dataset.i); setZoom(1); show(); };
     fileList.appendChild(el);
   }
@@ -468,6 +499,38 @@ function renderSidebarFavs() {
     if (hasFav && !dot) { dot = document.createElement('span'); dot.className = 'has-fav'; dot.textContent = '★'; el.appendChild(dot); }
     else if (!hasFav && dot) dot.remove();
   });
+}
+
+// Per-folder download tally in the sidebar, so a pack you have already worked
+// through is obvious without opening it.
+function renderSidebarDownloads() {
+  document.querySelectorAll('.folder:not(.favorites-entry)').forEach(el => {
+    const f = el.dataset.f;
+    const span = el.querySelector('.folder-dl');
+    if (!span || !data[f]) return;
+    const s = folderStats(data[f]);
+    const parts = [];
+    if (s.done) parts.push(s.done + '✓');
+    if (s.queued) parts.push(s.queued + '⬇');
+    span.textContent = parts.join(' ');
+    el.title = f + ' — ' + s.total + ' images, ' + s.linked + ' linked to videos, ' +
+      s.done + ' downloaded' + (s.queued ? ', ' + s.queued + ' queued' : '');
+  });
+}
+
+function cycleFilter() {
+  filterMode = filterMode === 'all' ? 'new' : filterMode === 'new' ? 'done' : 'all';
+  filterBtn.textContent = filterMode === 'all' ? 'all' : filterMode === 'new' ? 'not downloaded' : 'downloaded';
+  filterBtn.classList.toggle('on', filterMode !== 'all');
+  renderFileList();
+  ensureVisible();
+  show();
+}
+
+// Keep the viewer on an entry the current filter actually shows.
+function ensureVisible() {
+  const nav = navIndices();
+  if (nav.length && !nav.includes(idx)) idx = nav[0];
 }
 
 function currentImgs() {
@@ -542,6 +605,7 @@ async function toggleDownload() {
   renderDownload();
   renderFileList();
   updateFileActive();
+  renderSidebarDownloads();
 }
 
 async function downloadFavorites() {
@@ -562,6 +626,7 @@ async function downloadFavorites() {
   renderDownload();
   renderFileList();
   updateFileActive();
+  renderSidebarDownloads();
 }
 
 function imgUrl(path) {
@@ -581,7 +646,9 @@ function show() {
   empty.style.display = 'none';
   img.src = imgUrl(imgs[idx]);
   imgName.textContent = imgs[idx].split('/').pop();
-  imgCounter.textContent = (idx + 1) + ' / ' + imgs.length;
+  const st = folderStats(imgs);
+  imgCounter.textContent = (idx + 1) + ' / ' + imgs.length +
+    (st.linked ? ' · ' + st.done + '✓' + (st.queued ? ' ' + st.queued + '⬇' : '') : '');
   favBtn.textContent = favorites.has(imgs[idx]) ? '★' : '☆';
   favBtn.classList.toggle('active', favorites.has(imgs[idx]));
   history.replaceState(null, '', '#' + encodeURIComponent(folder) + '/' + idx);
@@ -628,10 +695,13 @@ searchInput.addEventListener('input', () => {
   }
 });
 
-function getMatchIndices() {
-  const indices = [];
-  fileList.querySelectorAll('.file-entry').forEach((el, i) => { if (el.classList.contains('search-match')) indices.push(i); });
-  return indices;
+// Which entries the arrow keys step through: whatever the filter leaves visible,
+// narrowed to search hits when a search is active.
+function navIndices() {
+  const visible = Array.from(fileList.querySelectorAll('.file-entry'))
+    .filter(el => !el.classList.contains('filtered-out'));
+  const matched = visible.filter(el => el.classList.contains('search-match'));
+  return (matched.length ? matched : visible).map(el => parseInt(el.dataset.i));
 }
 
 document.addEventListener('keydown', e => {
@@ -645,21 +715,19 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === '/') { e.preventDefault(); searchInput.focus(); return; }
   if (!folder) return;
-  const imgs = viewingFavs ? getFavImgs() : (data[folder] ?? []), fi = folders.indexOf(folder);
+  const fi = folders.indexOf(folder);
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-    const matches = getMatchIndices();
-    if (matches.length) {
-      const pos = matches.indexOf(idx);
-      const next = matches[pos < matches.length - 1 ? pos + 1 : pos];
-      if (next !== idx) { idx = next; show(); }
-    } else if (idx < imgs.length - 1) { idx++; show(); }
+    const nav = navIndices();
+    const pos = nav.indexOf(idx);
+    // Landing outside the nav set (filter just changed under us) jumps forward
+    // to the nearest entry that is still reachable.
+    const next = pos === -1 ? nav.find(i => i > idx) : nav[pos + 1];
+    if (next !== undefined) { idx = next; show(); }
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    const matches = getMatchIndices();
-    if (matches.length) {
-      const pos = matches.indexOf(idx);
-      const prev = matches[pos > 0 ? pos - 1 : 0];
-      if (prev !== idx) { idx = prev; show(); }
-    } else if (idx > 0) { idx--; show(); }
+    const nav = navIndices();
+    const pos = nav.indexOf(idx);
+    const prev = pos === -1 ? [...nav].reverse().find(i => i < idx) : nav[pos - 1];
+    if (prev !== undefined) { idx = prev; show(); }
   }
   else if (e.key === ']') { if (fi < folders.length - 1) pick(folders[fi + 1]); }
   else if (e.key === '[') { if (fi > 0) pick(folders[fi - 1]); }
@@ -670,6 +738,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'm') toggleMode();
   else if (e.key === 'd') toggleDownload();
   else if (e.key === 'D') downloadFavorites();
+  else if (e.key === 't') cycleFilter();
 });
 
 viewer.addEventListener('wheel', e => { if (scrollMode) return; e.preventDefault(); setZoom(e.deltaY < 0 ? zoom * 1.1 : zoom / 1.1); }, { passive: false });
@@ -678,6 +747,7 @@ favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(); }
 modeBtn.addEventListener('click', e => { e.stopPropagation(); toggleMode(); });
 dlBtn.addEventListener('click', e => { e.stopPropagation(); toggleDownload(); });
 dlFavsBtn.addEventListener('click', e => { e.stopPropagation(); downloadFavorites(); });
+filterBtn.addEventListener('click', e => { e.stopPropagation(); cycleFilter(); });
 
 // Queued videos finish while you keep browsing, so refresh the link states
 // periodically -- the server caches for the same interval, so this is cheap.
@@ -688,6 +758,7 @@ setInterval(async () => {
   renderFileList();
   idx = active;
   updateFileActive();
+  renderSidebarDownloads();
 }, 30000);
 
 load();
