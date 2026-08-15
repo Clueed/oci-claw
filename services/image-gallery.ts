@@ -289,6 +289,10 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 .file-entry.is-done:hover { color: #8aa; }
 .file-entry.filtered-out { display: none; }
 .folder .folder-dl { color: #3a9a6a; font-size: 9px; margin-left: 4px; }
+.file-entry .fav-dot { font-size: 9px; margin-left: 4px; color: #f0c040; }
+/* A favorited entry stays legible even once its video is downloaded and dimmed. */
+.file-entry.is-done.is-fav { color: #6a6250; }
+#filter-btn.fav { color: #f0c040; border-color: #5a4a18; }
 #filter-btn { background: none; border: 1px solid #2a2a2a; border-radius: 4px; color: #666; font-size: 11px; cursor: pointer; padding: 3px 8px; line-height: 1.4; }
 #filter-btn:hover { color: #ddd; border-color: #444; }
 #filter-btn.on { color: #3a9a6a; border-color: #2f5a48; }
@@ -375,12 +379,13 @@ async function load() {
     const el = document.createElement('div');
     el.className = 'folder';
     el.dataset.f = f;
-    const hasFav = data[f].some(p => favorites.has(p));
-    el.innerHTML = '<span class="folder-name">' + f + '</span><span class="folder-count">' + data[f].length + '</span>' + '<span class="folder-dl"></span>' + (hasFav ? '<span class="has-fav">★</span>' : '');
+    // Both tallies are filled in by their render passes below.
+    el.innerHTML = '<span class="folder-name">' + f + '</span><span class="folder-count">' + data[f].length + '</span>' + '<span class="folder-dl"></span><span class="has-fav"></span>';
     el.onclick = () => pick(f);
     folderList.appendChild(el);
   }
   renderSidebarDownloads();
+  renderSidebarFavs();
   const hash = location.hash.slice(1);
   if (hash) {
     const slash = hash.lastIndexOf('/');
@@ -456,9 +461,17 @@ function renderFileList() {
       dot.textContent = l.done ? '✓' : '⬇';
       el.appendChild(dot);
     }
+    if (favorites.has(imgs[i])) {
+      el.classList.add('is-fav');
+      const star = document.createElement('span');
+      star.className = 'fav-dot';
+      star.textContent = '★';
+      el.appendChild(star);
+    }
     // Hidden rather than removed, so entry positions keep matching image indices.
     if (filterMode === 'new' && l && (l.done || l.wanted)) el.classList.add('filtered-out');
     if (filterMode === 'done' && !(l && l.done)) el.classList.add('filtered-out');
+    if (filterMode === 'fav' && !favorites.has(imgs[i])) el.classList.add('filtered-out');
     el.onclick = () => { idx = parseInt(el.dataset.i); setZoom(1); show(); };
     fileList.appendChild(el);
   }
@@ -480,10 +493,11 @@ async function toggleFavorite() {
     body: JSON.stringify({ path }),
   });
   favorites = new Set(await res.json());
-  if (viewingFavs) {
-    if (idx >= getFavImgs().length) idx = Math.max(0, idx - 1);
-    renderFileList();
-  }
+  if (viewingFavs && idx >= getFavImgs().length) idx = Math.max(0, idx - 1);
+  // Always re-render: the entry's own star changes, and under the favorites
+  // filter un-starring hides the row the viewer is sitting on.
+  renderFileList();
+  ensureVisible();
   show();
   renderSidebarFavs();
 }
@@ -492,12 +506,13 @@ function renderSidebarFavs() {
   const favCount = Object.values(data).flat().filter(p => favorites.has(p)).length;
   const favEl = folderList.querySelector('.favorites-entry .folder-count');
   if (favEl) favEl.textContent = favCount;
+  // Count rather than a bare marker, to match the download tally beside it.
   document.querySelectorAll('.folder:not(.favorites-entry)').forEach(el => {
     const f = el.dataset.f;
-    const hasFav = data[f] && data[f].some(p => favorites.has(p));
-    let dot = el.querySelector('.has-fav');
-    if (hasFav && !dot) { dot = document.createElement('span'); dot.className = 'has-fav'; dot.textContent = '★'; el.appendChild(dot); }
-    else if (!hasFav && dot) dot.remove();
+    const span = el.querySelector('.has-fav');
+    if (!span || !data[f]) return;
+    const n = data[f].filter(p => favorites.has(p)).length;
+    span.textContent = n ? n + '★' : '';
   });
 }
 
@@ -518,10 +533,14 @@ function renderSidebarDownloads() {
   });
 }
 
+const FILTERS = ['all', 'fav', 'new', 'done'];
+const FILTER_LABELS = { all: 'all', fav: '★ favorited', new: 'not downloaded', done: 'downloaded' };
+
 function cycleFilter() {
-  filterMode = filterMode === 'all' ? 'new' : filterMode === 'new' ? 'done' : 'all';
-  filterBtn.textContent = filterMode === 'all' ? 'all' : filterMode === 'new' ? 'not downloaded' : 'downloaded';
+  filterMode = FILTERS[(FILTERS.indexOf(filterMode) + 1) % FILTERS.length];
+  filterBtn.textContent = FILTER_LABELS[filterMode];
   filterBtn.classList.toggle('on', filterMode !== 'all');
+  filterBtn.classList.toggle('fav', filterMode === 'fav');
   renderFileList();
   ensureVisible();
   show();
