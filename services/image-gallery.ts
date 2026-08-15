@@ -11,6 +11,183 @@ function isImage(name: string): boolean {
   return IMAGE_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
 }
 
+// Same extension list the transmission done-script uploads to stash, so a video
+// the gallery offers to fetch is one that will actually reach the library.
+const VIDEO_EXTS = new Set([
+  "mp4", "mkv", "avi", "mov", "wmv", "m4v", "ts",
+  "webm", "flv", "mpg", "mpeg", "divx", "vob",
+]);
+
+function isVideo(name: string): boolean {
+  return VIDEO_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
+}
+
+const IMAGE_EXT_RE = new RegExp("\\.(" + [...IMAGE_EXTS].join("|") + ")$", "i");
+
+const baseName = (p: string): string => p.split("/").pop() ?? p;
+const stripExt = (s: string): string => s.replace(/\.[^.]+$/, "");
+// Torrent packs are inconsistent about spacing and case, nothing else.
+const norm = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+// Loopback, no auth -- transmission is configured with
+// rpc-authentication-required = false and binds 127.0.0.1 only.
+const rpcUrl = process.env.TRANSMISSION_RPC ?? "http://127.0.0.1:9091/transmission/rpc";
+let sessionId = "";
+
+async function rpc(body: unknown): Promise<any> {
+  const send = () =>
+    fetch(rpcUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Transmission-Session-Id": sessionId,
+      },
+      body: JSON.stringify(body),
+    });
+
+  let res = await send();
+  // 409 is transmission handing us a fresh CSRF token; retry once with it.
+  if (res.status === 409) {
+    sessionId = res.headers.get("X-Transmission-Session-Id") ?? "";
+    res = await send();
+  }
+  if (!res.ok) throw new Error("transmission rpc " + res.status);
+  return await res.json();
+}
+
+interface Link {
+  torrentId: number;
+  fileIndex: number;
+  video: string;
+  size: number;
+  wanted: boolean;
+  done: boolean;
+  rule: "exact" | "stem";
+}
+
+// The full file list of every torrent is ~2MB, so don't refetch it per
+// keystroke. Selecting invalidates it explicitly, so the UI still updates
+// immediately after an action.
+const TORRENT_TTL_MS = 30_000;
+let torrentCache: any[] | null = null;
+let linkCache: Record<string, Link> | null = null;
+let cachedAt = 0;
+
+function invalidateTorrents(): void {
+  torrentCache = null;
+  linkCache = null;
+}
+
+async function getTorrents(): Promise<any[]> {
+  if (torrentCache && Date.now() - cachedAt < TORRENT_TTL_MS) return torrentCache;
+  const r = await rpc({
+    method: "torrent-get",
+    arguments: { fields: ["id", "name", "downloadDir", "files", "fileStats"] },
+  });
+  torrentCache = r.arguments?.torrents ?? [];
+  linkCache = null;
+  cachedAt = Date.now();
+  return torrentCache;
+}
+
+// Map each preview image (keyed by its path relative to the gallery root, which
+// is exactly how /api/images names it) to the video it depicts.
+//
+// Packs name previews one of two ways, and across every torrent seen so far the
+// pair of rules resolves every video with zero ambiguous basenames:
+//   exact -- "clip.mp4"  -> "Screens/clip.mp4.jpg"   (extension kept)
+//   stem  -- "clip.mp4"  -> "Screens/clip.jpg"       (extension replaced)
+// Matching is on basename within a single torrent, because the preview sits in
+// a Screens/ subfolder while the video sits at the torrent root -- the
+// directory parts deliberately do not line up.
+//
+// Images with no match are photo sets (Images/, Pictures/, Photo/), not failed
+// lookups: they get no entry, and the UI shows them as having no linked video
+// rather than guessing.
+async function buildLinks(): Promise<Record<string, Link>> {
+  if (linkCache) return linkCache;
+
+  const galleryRoot = path.resolve(downloadsDir);
+  const links: Record<string, Link> = {};
+
+  for (const t of await getTorrents()) {
+    const dir = path.resolve(t.downloadDir ?? downloadsDir);
+    const files: any[] = t.files ?? [];
+    const stats: any[] = t.fileStats ?? [];
+
+    const byBase = new Map<string, number>();
+    const byStem = new Map<string, number>();
+    files.forEach((f, i) => {
+      if (!isVideo(f.name)) return;
+      const b = baseName(f.name);
+      if (!byBase.has(norm(b))) byBase.set(norm(b), i);
+      const s = norm(stripExt(b));
+      if (!byStem.has(s)) byStem.set(s, i);
+    });
+
+    files.forEach((f) => {
+      const b = baseName(f.name);
+      if (!isImage(b)) return;
+
+      // A torrent may download outside the gallery root; skip what we can't serve.
+      const abs = path.resolve(dir, f.name);
+      if (abs !== galleryRoot && !abs.startsWith(galleryRoot + path.sep)) return;
+
+      const stem = b.replace(IMAGE_EXT_RE, "");
+      let idx = byBase.get(norm(stem));
+      let rule: Link["rule"] = "exact";
+      if (idx === undefined) {
+        idx = byStem.get(norm(stripExt(stem))) ?? byStem.get(norm(stem));
+        rule = "stem";
+      }
+      if (idx === undefined) return;
+
+      const vf = files[idx];
+      links[path.relative(galleryRoot, abs)] = {
+        torrentId: t.id,
+        fileIndex: idx,
+        video: baseName(vf.name),
+        size: vf.length,
+        wanted: stats[idx]?.wanted !== false,
+        done: vf.length > 0 && vf.bytesCompleted >= vf.length,
+        rule,
+      };
+    });
+  }
+
+  linkCache = links;
+  return links;
+}
+
+// Flip the wanted flag on the videos behind the given preview images, then
+// start their torrents -- the added-hook leaves a screens-only torrent idle
+// once the images finish, so a newly wanted video needs an explicit start.
+async function setWanted(paths: string[], wanted: boolean): Promise<number> {
+  const links = await buildLinks();
+  const byTorrent = new Map<number, Set<number>>();
+
+  for (const p of paths) {
+    const link = links[p];
+    if (!link) continue;
+    if (!byTorrent.has(link.torrentId)) byTorrent.set(link.torrentId, new Set());
+    byTorrent.get(link.torrentId)!.add(link.fileIndex);
+  }
+
+  let n = 0;
+  for (const [id, indices] of byTorrent) {
+    const key = wanted ? "files-wanted" : "files-unwanted";
+    await rpc({
+      method: "torrent-set",
+      arguments: { ids: [id], [key]: [...indices] },
+    });
+    if (wanted) await rpc({ method: "torrent-start", arguments: { ids: [id] } });
+    n += indices.size;
+  }
+
+  if (n) invalidateTorrents();
+  return n;
+}
+
 const favoritesFile = process.argv[5] ?? path.join(downloadsDir, ".gallery-favorites.json");
 
 async function readFavorites(): Promise<string[]> {
@@ -95,6 +272,17 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 #fav-btn.active { color: #f0c040; }
 #mode-btn { background: none; border: none; font-size: 16px; cursor: pointer; padding: 2px 6px; color: #555; line-height: 1; }
 #mode-btn:hover { color: #aaa; }
+#dl-btn { background: none; border: none; font-size: 16px; cursor: pointer; padding: 2px 6px; color: #555; line-height: 1; }
+#dl-btn:hover:not(:disabled) { color: #aaa; }
+#dl-btn:disabled { opacity: 0.25; cursor: default; }
+#dl-btn.wanted, #dl-btn.done { color: #3a9a6a; }
+#dl-favs-btn { background: none; border: 1px solid #2a2a2a; border-radius: 4px; color: #666; font-size: 11px; cursor: pointer; padding: 3px 8px; line-height: 1.4; }
+#dl-favs-btn:hover { color: #ddd; border-color: #444; }
+#dl-info { font-size: 11px; color: #666; flex-shrink: 0; }
+#dl-info.wanted { color: #3a9a6a; }
+#dl-info.none { color: #3a3a3a; }
+#dl-info.warn { color: #b8862c; }
+.file-entry .dl-dot { font-size: 9px; margin-left: 4px; color: #3a9a6a; }
 .folder.favorites-entry { color: #f0c040; }
 .folder.favorites-entry .folder-count { color: #886622; }
 .folder.favorites-entry.active { background: #3a3010; }
@@ -117,7 +305,10 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
   <div id="toolbar">
     <button id="fav-btn" title="Toggle favorite (f)">☆</button>
     <button id="mode-btn" title="Toggle view mode (m)">⊞</button>
+    <button id="dl-btn" title="Download the linked video (d)">⬇</button>
+    <button id="dl-favs-btn" title="Download every favorited video (D)">⬇ favs</button>
     <span id="img-name">—</span>
+    <span id="dl-info"></span>
     <span id="img-counter"></span>
   </div>
   <div id="viewer">
@@ -126,7 +317,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
   </div>
 </div>
 <script>
-let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false, scrollMode = false;
+let data = {}, folders = [], folder = null, idx = 0, zoom = 1, favorites = new Set(), viewingFavs = false, scrollMode = false, links = {};
 const img = document.getElementById('current-img');
 const empty = document.getElementById('empty');
 const folderList = document.getElementById('folder-list');
@@ -137,11 +328,25 @@ const imgCounter = document.getElementById('img-counter');
 const viewer = document.getElementById('viewer');
 const favBtn = document.getElementById('fav-btn');
 const modeBtn = document.getElementById('mode-btn');
+const dlBtn = document.getElementById('dl-btn');
+const dlInfo = document.getElementById('dl-info');
+const dlFavsBtn = document.getElementById('dl-favs-btn');
+
+// Transmission being unreachable must not break browsing, so the link map
+// degrades to empty and the download controls simply stay disabled.
+async function loadLinks() {
+  try {
+    const r = await fetch('/api/links');
+    const j = await r.json();
+    links = r.ok && !j.error ? j : {};
+  } catch { links = {}; }
+}
 
 async function load() {
   [data, favArr] = await Promise.all([
     fetch('/api/images').then(r => r.json()),
     fetch('/api/favorites').then(r => r.json()),
+    loadLinks(),
   ]);
   favorites = new Set(favArr);
   folders = Object.keys(data).sort();
@@ -216,6 +421,13 @@ function renderFileList() {
     el.dataset.i = String(i);
     el.textContent = name;
     el.title = imgs[i];
+    const l = links[imgs[i]];
+    if (l && (l.wanted || l.done)) {
+      const dot = document.createElement('span');
+      dot.className = 'dl-dot';
+      dot.textContent = l.done ? '✓' : '⬇';
+      el.appendChild(dot);
+    }
     el.onclick = () => { idx = parseInt(el.dataset.i); setZoom(1); show(); };
     fileList.appendChild(el);
   }
@@ -258,6 +470,100 @@ function renderSidebarFavs() {
   });
 }
 
+function currentImgs() {
+  return viewingFavs ? getFavImgs() : (data[folder] ?? []);
+}
+
+function fmtSize(b) {
+  if (b >= 1e9) return (b / 1e9).toFixed(2) + ' GB';
+  if (b >= 1e6) return (b / 1e6).toFixed(0) + ' MB';
+  return (b / 1e3).toFixed(0) + ' kB';
+}
+
+// Reflect the linked video's state in the toolbar. Four cases: no linked video
+// (photo-set image), already downloaded, wanted but not yet complete, and
+// available to request.
+function renderDownload() {
+  const imgs = currentImgs();
+  const p = imgs[idx];
+  const l = p ? links[p] : null;
+
+  if (!l) {
+    dlBtn.disabled = true;
+    dlBtn.textContent = '⬇';
+    dlBtn.className = '';
+    dlBtn.title = 'No video linked to this image';
+    dlInfo.className = 'none';
+    dlInfo.textContent = p ? 'no linked video' : '';
+    return;
+  }
+
+  dlBtn.disabled = false;
+  dlBtn.title = l.video;
+  let info;
+  if (l.done) {
+    dlBtn.textContent = '✓'; dlBtn.className = 'done';
+    dlInfo.className = 'wanted'; info = 'downloaded · ' + fmtSize(l.size);
+  } else if (l.wanted) {
+    dlBtn.textContent = '⏳'; dlBtn.className = 'wanted';
+    dlInfo.className = 'wanted'; info = 'queued · ' + fmtSize(l.size);
+  } else {
+    dlBtn.textContent = '⬇'; dlBtn.className = '';
+    dlInfo.className = ''; info = fmtSize(l.size);
+  }
+  // Surface the weaker match rule rather than trusting it silently, so a pack
+  // with an unusual naming scheme is visible instead of downloading the wrong file.
+  if (l.rule === 'stem') { info += ' · matched by stem'; dlInfo.className = 'warn'; }
+  dlInfo.textContent = info;
+}
+
+async function postSelect(paths, wanted) {
+  const res = await fetch('/api/select', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths, wanted }),
+  });
+  const j = await res.json();
+  if (j.links) links = j.links;
+  return j;
+}
+
+async function toggleDownload() {
+  const imgs = currentImgs();
+  const p = imgs[idx];
+  const l = p ? links[p] : null;
+  if (!l || l.done) return;
+  dlInfo.className = ''; dlInfo.textContent = 'working…';
+  try {
+    await postSelect([p], !l.wanted);
+  } catch {
+    dlInfo.className = 'warn'; dlInfo.textContent = 'request failed';
+    return;
+  }
+  renderDownload();
+  renderFileList();
+  updateFileActive();
+}
+
+async function downloadFavorites() {
+  const paths = getFavImgs().filter(p => links[p] && !links[p].wanted && !links[p].done);
+  if (!paths.length) {
+    dlInfo.className = 'none'; dlInfo.textContent = 'no new favorited videos';
+    return;
+  }
+  const total = paths.reduce((s, p) => s + links[p].size, 0);
+  if (!confirm('Download ' + paths.length + ' video(s), ' + fmtSize(total) + '?')) return;
+  dlInfo.className = ''; dlInfo.textContent = 'working…';
+  try {
+    await postSelect(paths, true);
+  } catch {
+    dlInfo.className = 'warn'; dlInfo.textContent = 'request failed';
+    return;
+  }
+  renderDownload();
+  renderFileList();
+  updateFileActive();
+}
+
 function imgUrl(path) {
   return '/files/' + path.split('/').map(encodeURIComponent).join('/');
 }
@@ -270,7 +576,7 @@ function preload(imgs, from, count) {
 
 function show() {
   const imgs = viewingFavs ? getFavImgs() : (data[folder] ?? []);
-  if (!imgs.length) { img.style.display = 'none'; empty.style.display = ''; favBtn.textContent = '☆'; return; }
+  if (!imgs.length) { img.style.display = 'none'; empty.style.display = ''; favBtn.textContent = '☆'; renderDownload(); return; }
   img.style.display = '';
   empty.style.display = 'none';
   img.src = imgUrl(imgs[idx]);
@@ -281,6 +587,7 @@ function show() {
   history.replaceState(null, '', '#' + encodeURIComponent(folder) + '/' + idx);
   preload(imgs, idx + 1, 3);
   updateFileActive();
+  renderDownload();
 }
 
 function setZoom(z) {
@@ -361,12 +668,27 @@ document.addEventListener('keydown', e => {
   else if (e.key === '0') setZoom(1);
   else if (e.key === 'f') toggleFavorite();
   else if (e.key === 'm') toggleMode();
+  else if (e.key === 'd') toggleDownload();
+  else if (e.key === 'D') downloadFavorites();
 });
 
 viewer.addEventListener('wheel', e => { if (scrollMode) return; e.preventDefault(); setZoom(e.deltaY < 0 ? zoom * 1.1 : zoom / 1.1); }, { passive: false });
 viewer.addEventListener('click', () => { if (!scrollMode) setZoom(zoom > 1 ? 1 : 2); });
 favBtn.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(); });
 modeBtn.addEventListener('click', e => { e.stopPropagation(); toggleMode(); });
+dlBtn.addEventListener('click', e => { e.stopPropagation(); toggleDownload(); });
+dlFavsBtn.addEventListener('click', e => { e.stopPropagation(); downloadFavorites(); });
+
+// Queued videos finish while you keep browsing, so refresh the link states
+// periodically -- the server caches for the same interval, so this is cheap.
+setInterval(async () => {
+  await loadLinks();
+  renderDownload();
+  const active = idx;
+  renderFileList();
+  idx = active;
+  updateFileActive();
+}, 30000);
 
 load();
 </script>
@@ -387,6 +709,26 @@ const server = Bun.serve({
 
     if (url.pathname === "/api/images") {
       return Response.json(await scanDir(downloadsDir));
+    }
+
+    if (url.pathname === "/api/links") {
+      try {
+        return Response.json(await buildLinks());
+      } catch (e) {
+        // Transmission down: the gallery still browses, just without selection.
+        return Response.json({ error: String(e) }, { status: 503 });
+      }
+    }
+
+    if (url.pathname === "/api/select" && req.method === "POST") {
+      try {
+        const body = await req.json();
+        const paths: string[] = body.paths ?? (body.path ? [body.path] : []);
+        const updated = await setWanted(paths, body.wanted !== false);
+        return Response.json({ updated, links: await buildLinks() });
+      } catch (e) {
+        return Response.json({ error: String(e) }, { status: 502 });
+      }
     }
 
     if (url.pathname === "/api/favorites") {
