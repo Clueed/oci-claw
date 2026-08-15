@@ -249,10 +249,14 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 .folder { padding: 5px 8px; cursor: pointer; border-radius: 4px; font-size: 13px; margin-bottom: 1px; display: flex; justify-content: space-between; align-items: center; }
 .folder:hover { background: #1e1e1e; }
 .folder.active { background: #1a3a6a; color: #fff; }
-.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .folder-count { color: #555; font-size: 11px; margin-left: 6px; flex-shrink: 0; }
 .folder.active .folder-count { color: #aaa; }
-.file-entry { padding: 4px 8px; cursor: pointer; border-radius: 3px; font-size: 12px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #888; }
+/* Flex row so the name truncates on its own and the state icons, being
+   flex-shrink:0 siblings, stay visible however long the name is. */
+.file-entry { display: flex; align-items: center; padding: 4px 8px; cursor: pointer; border-radius: 3px; font-size: 12px; margin-bottom: 1px; overflow: hidden; color: #888; }
+.file-entry .fname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-entry .dl-dot, .file-entry .fav-dot { flex-shrink: 0; }
 .file-entry:hover { background: #1e1e1e; color: #ddd; }
 .file-entry.active { background: #1a3a6a; color: #fff; }
 .file-entry.search-match { color: #6af; }
@@ -288,7 +292,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 .file-entry.is-done { color: #4a5a52; }
 .file-entry.is-done:hover { color: #8aa; }
 .file-entry.filtered-out { display: none; }
-.folder .folder-dl { color: #3a9a6a; font-size: 9px; margin-left: 4px; }
+.folder .folder-dl { color: #3a9a6a; font-size: 9px; margin-left: 4px; flex-shrink: 0; }
 .file-entry .fav-dot { font-size: 9px; margin-left: 4px; color: #f0c040; }
 /* A favorited entry stays legible even once its video is downloaded and dimmed. */
 .file-entry.is-done.is-fav { color: #6a6250; }
@@ -299,7 +303,7 @@ body { background: #111; color: #ddd; font-family: sans-serif; display: flex; he
 .folder.favorites-entry { color: #f0c040; }
 .folder.favorites-entry .folder-count { color: #886622; }
 .folder.favorites-entry.active { background: #3a3010; }
-.folder .has-fav { color: #f0c040; font-size: 9px; margin-left: 4px; }
+.folder .has-fav { color: #f0c040; font-size: 9px; margin-left: 4px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -451,7 +455,10 @@ function renderFileList() {
     const el = document.createElement('div');
     el.className = 'file-entry';
     el.dataset.i = String(i);
-    el.textContent = name;
+    const label = document.createElement('span');
+    label.className = 'fname';
+    label.textContent = name;
+    el.appendChild(label);
     const l = links[imgs[i]];
     el.title = l ? imgs[i] + '\\n→ ' + l.video + (l.done ? ' (downloaded)' : l.wanted ? ' (queued)' : '') : imgs[i];
     if (l && (l.wanted || l.done)) {
