@@ -74,7 +74,7 @@ mint_token() {
   local repo=$1
   gh_api -X POST \
     "https://api.github.com/app/installations/${install_id}/access_tokens" \
-    -d "{\"repositories\":[\"${repo}\"],\"permissions\":{\"contents\":\"write\",\"pull_requests\":\"write\",\"metadata\":\"read\"}}" \
+    -d "{\"repositories\":[\"${repo}\"],\"permissions\":{\"contents\":\"write\",\"pull_requests\":\"write\",\"metadata\":\"read\",\"workflows\":\"write\",\"actions\":\"write\",\"checks\":\"read\",\"statuses\":\"read\"}}" \
     2>/dev/null | jq -r '.token' 2>/dev/null || true
 }
 
